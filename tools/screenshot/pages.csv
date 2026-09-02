@@ -1,0 +1,27 @@
+# 织梦 App 截图清单: 路由,文件名
+/plaza,plaza
+/plaza/post/1001,post-detail
+/plaza/publish,publish
+/search,search
+/ranking,ranking
+/work/101,work-detail
+/learn,learn
+/learn/course/201,course-detail
+/learn/upload,upload-tutorial
+/mall,mall
+/cart,cart
+/checkout,checkout
+/orders,orders
+/orders/3001,order-detail
+/orders/3001/aftersale,aftersale
+/profile,profile
+/profile/body,body-measurement
+/profile/preferences,preferences
+/profile/collections,collections
+/profile/works,my-works
+/profile/dashboard,dashboard
+/profile/commission,commission
+/profile/settings,settings
+/profile/help,help
+/messages,messages
+/profile/following,following
