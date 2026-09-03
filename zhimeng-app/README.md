@@ -32,23 +32,30 @@ npm run build      # 产物在 dist/，可静态部署
 | 我的 | 个人中心 | 体型数据采集（手动12项/AI拍照量体模拟）、偏好标签、收藏夹、作品集、关注 |
 | 我的 | 创作者后台 | KPI 面板（成交额/转化率/排名/成交量/退货率）、7日成交量折线、30日柱状、退货分析、渠道饼图、佣金与提现 |
 | 我的 | 品牌孵化 | 申请条件与流程入口 |
+| — | **服装设计App（创作工具端）** | 独立入口：我的 → 织梦·设计创作台 |
+| 设计 | 首页·灵感 | 新建设计（6 品类）、AI 生成入口、热门模板、灵感瀑布流 |
+| 设计 | **设计工作台** | 参数化设计（**6 品类 × 18 类款式元素**实时驱动 SVG 3D 服装）、撤销/重做、保存 |
+| 设计 | AI 工具箱 | 文生图（5 款候选一键应用）、草图优化、风格融合、**一人一版**（体型驱动版型） |
+| 设计 | 3D 试衣间 | 虚拟人台（体型数据）、6 场景背景、拖动旋转、动态展示动画、垂坠/光泽/弹性物理调节 |
+| 设计 | 我的作品 | 设计稿管理、**一键同步至官方App个人作品页**、删除/编辑 |
 
 ## 目录结构
 
 ```
 zhimeng-app/
 ├── src/
-│   ├── components/    # 共享组件（Icon/ui/NavBar/TabBar/Sheet 等）
-│   ├── data/          # 类型定义 + 模拟数据（用户/作品/推文/榜单/课程/订单/KPI）
+│   ├── components/
+│   │   ├── design/    # 服装设计App：DressCanvas 参数化引擎 / ParamPanel / DesignTabBar
+│   │   └── …官方App共享组件（Icon/ui/NavBar/TabBar/Sheet 等）
+│   ├── data/
+│   │   ├── types.ts + mock.ts   # 官方App 数据
+│   │   └── design.ts            # 设计App：18类元素/6品类/面料物理库/AI候选
 │   ├── pages/
-│   │   ├── plaza/     # 广场模块
-│   │   ├── ranking/   # 榜单 + 作品详情
-│   │   ├── learn/     # 学习中心
-│   │   ├── mall/      # 商城 + 订单
-│   │   └── profile/   # 我的 + 创作者后台
+│   │   ├── plaza/ ranking/ learn/ mall/ profile/  # 官方App 模块
+│   │   └── design/              # 设计App：StudioPage 工作台 / TryonPage 试衣间 …
 │   ├── styles/        # 设计系统
-│   ├── utils/store.tsx # localStorage 状态（点赞/收藏/购物车/体型数据）
-│   └── App.tsx        # 路由
+│   ├── utils/         # store.tsx + designStore.tsx（设计稿持久化与跨端同步标记）
+│   └── App.tsx        # 路由（官方App + /design/* 设计App）
 ├── public/images/     # 本地图片素材（Unsplash 精选服装图）
 └── docs/CONTRACT.md   # 并行开发契约
 ```
@@ -57,7 +64,8 @@ zhimeng-app/
 
 - 品牌色：玫瑰粉渐变 `#F27BA0 → #E85C87 → #D44771`，暖灰底 `#F6F4F1`
 - 全部数据为前端 mock（localStorage 持久化交互状态），可无缝替换为真实 API
-- 3D 预览为交互模拟（拖动旋转/缩放 + 背景切换 + 体模适配面板），真实 3D 渲染建议后续接入 glTF + 原生渲染
+- 官方App的 3D 预览为交互模拟；服装设计App的服装为**参数化 SVG 引擎实时重建**（18 类元素驱动几何），真实 3D 渲染建议后续按 PRD 接入原生 3D 引擎（SceneKit/Filament + glTF）
+- 跨端流转：设计App保存/同步的设计稿（params JSON）写入官方App「我的作品集」并可被发布推文关联，体现"设计 → 上架 → 变现"闭环
 
 ## 验证工具
 

@@ -50,6 +50,11 @@ const SettingsPage = L(() => import('./pages/profile/SettingsPage'));
 const HelpPage = L(() => import('./pages/profile/HelpPage'));
 const MessagesPage = L(() => import('./pages/profile/MessagesPage'));
 const FollowingPage = L(() => import('./pages/profile/FollowingPage'));
+const DesignHomePage = L(() => import('./pages/design/DesignHomePage'));
+const StudioPage = L(() => import('./pages/design/StudioPage'));
+const TryonPage = L(() => import('./pages/design/TryonPage'));
+const DesignWorksPage = L(() => import('./pages/design/DesignWorksPage'));
+const DesignLearnPage = L(() => import('./pages/design/DesignLearnPage'));
 
 export default function App() {
   return (
@@ -105,6 +110,13 @@ export default function App() {
               <Route path="/profile/help" element={<HelpPage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/profile/following" element={<FollowingPage />} />
+
+              {/* 服装设计App（独立创作工具端） */}
+              <Route path="/design" element={<DesignHomePage />} />
+              <Route path="/design/studio" element={<StudioPage />} />
+              <Route path="/design/tryon" element={<TryonPage />} />
+              <Route path="/design/works" element={<DesignWorksPage />} />
+              <Route path="/design/learn" element={<DesignLearnPage />} />
 
               <Route path="*" element={<Navigate to="/plaza" replace />} />
             </Routes>

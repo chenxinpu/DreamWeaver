@@ -6,6 +6,8 @@ import { Price } from '../../components/ui';
 import { Segmented, Sheet, useToast } from '../../components/Sheet';
 import { img, me, STYLE_TAGS, worksByCreator } from '../../data/mock';
 import { hideImg } from './parts';
+import { useDesignWorks } from '../../utils/designStore';
+import DressCanvas from '../../components/design/DressCanvas';
 
 /* 模拟相册图片 */
 const ALBUM_IMAGES = [
@@ -27,6 +29,8 @@ export default function PublishPage() {
   const [tags, setTags] = React.useState<string[]>([]);
   const [tagInput, setTagInput] = React.useState('');
   const myWorks = worksByCreator(me.id);
+  const { works: allDesignWorks } = useDesignWorks();
+  const designLinked = allDesignWorks.filter((w) => w.status === 'synced');
 
   const toggleImage = (src: string) => {
     if (images.includes(src)) { setImages(images.filter((x) => x !== src)); return; }
@@ -149,6 +153,36 @@ export default function PublishPage() {
                 </button>
               );
             })}
+            {designLinked.map((w) => {
+              const sel = linkedIds.includes(w.id);
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => toggleLinked(w.id)}
+                  className="row"
+                  style={{ gap: 10, padding: 10, borderRadius: 12, border: `1.5px solid ${sel ? 'var(--brand)' : 'var(--line)'}`, background: sel ? 'var(--brand-soft)' : '#fff', textAlign: 'left', transition: 'all .15s ease' }}
+                >
+                  <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#F0EBE6', border: '1px solid var(--line)' }}>
+                    <DressCanvas params={w.params} uid={`pub-${w.id}`} style={{ width: 52, height: 52 }} />
+                  </div>
+                  <div className="flex-1 col" style={{ minWidth: 0 }}>
+                    <span className="ellipsis" style={{ fontSize: 13.5, fontWeight: 600 }}>{w.title}</span>
+                    <div className="row" style={{ gap: 6, marginTop: 3 }}>
+                      <span style={{ fontSize: 10.5, color: 'var(--brand-deep)', background: 'var(--brand-soft)', padding: '1px 6px', borderRadius: 99, fontWeight: 600 }}>设计App</span>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{w.params.category === 'dress' ? '连衣裙' : w.params.category}</span>
+                    </div>
+                  </div>
+                  <span style={{ width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${sel ? 'var(--brand)' : 'var(--line)'}`, background: sel ? 'var(--brand-grad)' : '#fff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {sel && <Icon name="check" size={13} strokeWidth={2.6} />}
+                  </span>
+                </button>
+              );
+            })}
+            {myWorks.length + designLinked.length === 0 && (
+              <button className="row" style={{ gap: 8, padding: 12, borderRadius: 12, border: '1.5px dashed var(--brand)', color: 'var(--brand-deep)', fontSize: 13, justifyContent: 'center', background: 'var(--brand-soft)' }} onClick={() => navigate('/design/studio')}>
+                <Icon name="pen-tool" size={16} />去设计App创作作品后再来关联
+              </button>
+            )}
           </div>
         </div>
 

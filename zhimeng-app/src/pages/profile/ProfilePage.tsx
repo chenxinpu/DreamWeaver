@@ -154,6 +154,34 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* 创作中心（服装设计App）入口 */}
+        <button
+          onClick={() => navigate('/design')}
+          style={{
+            width: '100%', marginTop: 12, display: 'block', padding: '14px 16px', borderRadius: 16, textAlign: 'left',
+            background: 'linear-gradient(120deg,#2E2638 0%,#4A3A5C 55%,#8A5B9E 130%)', color: '#fff',
+            boxShadow: '0 10px 24px rgba(46,38,56,.3)', overflow: 'hidden', position: 'relative',
+          }}
+        >
+          <div className="row" style={{ gap: 12 }}>
+            <span style={{ width: 44, height: 44, borderRadius: 13, background: 'linear-gradient(135deg,#F27BA0,#D44771)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 14px rgba(0,0,0,.25)', flexShrink: 0 }}>
+              <Icon name="pen-tool" size={22} />
+            </span>
+            <div className="flex-1">
+              <div style={{ fontSize: 16, fontWeight: 700 }}>织梦 · 设计创作台</div>
+              <div style={{ fontSize: 11.5, opacity: .78, marginTop: 3 }}>参数化设计 · AI 生成 5 款候选 · 3D 试衣 · 一键上架</div>
+            </div>
+            <Icon name="chevron-right" size={18} color="rgba(255,255,255,.85)" />
+          </div>
+          <div className="row" style={{ marginTop: 12, gap: 6 }}>
+            {['文生图', '草图优化', '风格融合', '一人一版'].map((t) => (
+              <span key={t} style={{ fontSize: 10.5, padding: '3px 8px', borderRadius: 99, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.22)' }}>{t}</span>
+            ))}
+          </div>
+          <span style={{ position: 'absolute', right: -24, top: -30, width: 110, height: 110, borderRadius: '50%', background: 'rgba(255,255,255,.06)', pointerEvents: 'none' }} />
+          <span style={{ position: 'absolute', right: 40, bottom: -34, width: 90, height: 90, borderRadius: '50%', background: 'rgba(232,92,135,.18)', pointerEvents: 'none' }} />
+        </button>
+
         {/* 创作者后台卡 */}
         <div className="card tap" style={{ marginTop: 12, overflow: 'hidden' }} onClick={() => navigate('/profile/dashboard')}>
           <div className="row" style={{ padding: '14px 16px 0', gap: 8 }}>
