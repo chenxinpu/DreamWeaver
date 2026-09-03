@@ -34,7 +34,8 @@ cd designer && npm install && npm run dev     # http://localhost:5174
 
 信息架构以「画布」为核心，参数化仅是「3D 模拟」里的功能之一：
 
-- **首页（项目中心）**：2D 画布 / 3D 模拟双入口、最近项目（2D+3D 混合）、模板速建、AI 灵感工坊、趋势灵感
+- **创作链路工作台（/design/pipeline，核心）**：①灵感 → ②2D版片（6品类纸样版片、拖拽手柄改衣长/腰围松量/摆量、尺寸标注实时、放码/缝份/纱向）→ ③3D联动（**2D⇄3D 双向实时**：改版片手柄 3D 同步、3D 滑杆反向回版片）→ ④交付（工艺单 TechPack + 版片清单工件稿 + 导出/同步官方App）——极速验证、减少实物样衣
+- **首页（项目中心）**：创作链路入口、2D 画布 / 3D 模拟双入口、最近项目（2D+3D 混合）、模板速建、AI 灵感工坊、趋势灵感
 - **2D 画布**：人体模板（正/背面）与平铺模板（连衣裙/半裙/衬衫/裤装）起稿；自由笔触（颜色/粗细/橡皮/撤销）；区域填充（纯色/面料/图案）；标注；自动草稿
 - **素材库**：面料（克重 + 垂坠/光泽/弹性）、图案、辅料（纽扣/拉链/蕾丝/珍珠）、色卡
 - **3D 模拟**：参数化建模（6 品类 × 18 类款式元素 + AI 工具箱：文生图 5 款候选/草图优化/风格融合/一人一版）+ 3D 试衣（体型人台/6 场景/动态动画）
@@ -43,6 +44,6 @@ cd designer && npm install && npm run dev     # http://localhost:5174
 ## 技术说明
 
 - React 19 + TypeScript + Vite；无 UI 库依赖（纯 CSS 设计系统 + 行内 SVG）；移动优先（430px 手机壳）
-- 服装渲染：参数化 SVG 引擎（`designer/src/components/design/DressCanvas.tsx`，18 类元素实时重建几何 + 面料物理参数）；生产级可替换为 glTF + 原生引擎（SceneKit/Filament）
+- 服装渲染：参数化 SVG 引擎（`designer/src/components/design/DressCanvas.tsx`，18 类元素实时重建几何 + 面料物理参数）；版片由 `data/pattern.ts` 同源投影（长度/腰围松量/摆量为 2D⇄3D 共用连续量）；生产级可替换为 glTF + 原生引擎（SceneKit/Filament）
 - 数据为前端 mock（localStorage 持久化），交互层可对接 PRD 的 `/api/v1/*` 与 design-service / render-service
 - 自动化验证：仓库根 `tools/screenshot/`（Playwright QA/冒烟/截图，`pages-official.csv` / `pages-designer.csv`）

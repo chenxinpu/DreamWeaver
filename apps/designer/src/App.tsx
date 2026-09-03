@@ -20,6 +20,7 @@ const StudioPage = L(() => import('./pages/design/StudioPage'));
 const TryonPage = L(() => import('./pages/design/TryonPage'));
 const WorksPage = L(() => import('./pages/design/works/WorksPage'));
 const WorksDetailPage = L(() => import('./pages/design/works/WorksDetailPage'));
+const PipelineStudioPage = L(() => import('./pages/design/pipeline/PipelineStudioPage'));
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/design/tryon" element={<TryonPage />} />
             <Route path="/design/works" element={<WorksPage />} />
             <Route path="/design/works/:id" element={<WorksDetailPage />} />
+            <Route path="/design/pipeline" element={<PipelineStudioPage />} />
             <Route path="*" element={<Navigate to="/design" replace />} />
           </Routes>
         </div>

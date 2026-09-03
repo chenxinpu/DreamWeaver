@@ -21,6 +21,18 @@ interface Item { kind: 'd3' | 'sketch'; id: number; title: string }
 interface MenuState { kind: 'd3' | 'sketch'; id: number; title: string }
 interface DelState { kind: 'd3' | 'sketch'; id: number; title: string }
 
+/** 创作链路深紫渐变（与首页创作链路 Hero 一体的视觉） */
+const PURPLE = 'linear-gradient(140deg,#6E5AA8 0%,#4A3877 52%,#332752 100%)';
+
+/** 空态里的链路引导行（点按 → 创作链路工作台） */
+function ChainEmptyLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="row" style={{ margin: '14px auto 0', gap: 4, fontSize: 11.5, fontWeight: 600, color: '#7A66B8' }}>
+      <Icon name="layers" size={13} />或走创作链路：手稿 → 2D 版片 → 3D 联动 → 交付
+    </button>
+  );
+}
+
 /* ---------- 状态 Tag ---------- */
 function StatusTag({ w }: { w: DesignWork }) {
   return w.status === 'synced'
@@ -126,7 +138,12 @@ export default function WorksPage() {
                 icon="dress"
                 title="还没有 3D 参数稿"
                 desc="在参数化建模中完成的设计会自动收入这里"
-                action={<button onClick={() => navigate('/design/studio')} className="btn btn-primary">去3D建模</button>}
+                action={
+                  <>
+                    <button onClick={() => navigate('/design/studio')} className="btn btn-primary">去3D建模</button>
+                    <ChainEmptyLink onClick={() => { toast('已进入创作链路', 'layers'); navigate('/design/pipeline?cat=dress'); }} />
+                  </>
+                }
               />
             ) : (
               <EmptyState
@@ -134,9 +151,12 @@ export default function WorksPage() {
                 title="还没有作品"
                 desc="从 2D 画布或 3D 参数化建模开始你的第一件设计"
                 action={
-                  <div className="row" style={{ gap: 8, justifyContent: 'center' }}>
-                    <button onClick={() => navigate('/design/canvas')} className="btn btn-outline">去画布</button>
-                    <button onClick={() => navigate('/design/studio')} className="btn btn-primary">去3D建模</button>
+                  <div>
+                    <div className="row" style={{ gap: 8, justifyContent: 'center' }}>
+                      <button onClick={() => navigate('/design/canvas')} className="btn btn-outline">去画布</button>
+                      <button onClick={() => navigate('/design/studio')} className="btn btn-primary">去3D建模</button>
+                    </div>
+                    <ChainEmptyLink onClick={() => { toast('已进入创作链路', 'layers'); navigate('/design/pipeline?cat=dress'); }} />
                   </div>
                 }
               />
@@ -149,7 +169,7 @@ export default function WorksPage() {
                 const w = works.find((x) => x.id === it.id);
                 if (!w) return null;
                 return (
-                  <div key={`d3-${w.id}`} onClick={() => goItem(it)} className="card" style={{ marginBottom: 10, padding: 0, overflow: 'hidden', cursor: 'pointer', display: 'flex' }}>
+                  <div key={`d3-${w.id}`} onClick={() => goItem(it)} className="card" style={{ marginBottom: 10, padding: 0, overflow: 'hidden', cursor: 'pointer', display: 'flex', position: 'relative' }}>
                     {/* 缩略：DressCanvas 白底 */}
                     <div style={{ width: 100, flexShrink: 0, background: '#FDFCFA', padding: '10px 8px 0', borderRight: '1px solid var(--line)' }}>
                       <DressCanvas params={w.params} uid={`w3d-${w.id}`} />
@@ -167,6 +187,15 @@ export default function WorksPage() {
                         <span className="ellipsis">{w.updatedAt}</span>
                       </div>
                     </div>
+                    {/* 卡右下角：进入 2D⇄3D 联动工作台（点卡其余区域仍进详情） */}
+                    <button
+                      aria-label="2D⇄3D 联动工作台"
+                      title="2D⇄3D 联动工作台"
+                      onClick={(e) => { e.stopPropagation(); toast('已打开 2D⇄3D 联动工作台', 'rotate'); navigate(`/design/pipeline?id=${w.id}`); }}
+                      style={{ position: 'absolute', right: 10, bottom: 8, width: 30, height: 30, borderRadius: '50%', border: '1px solid #E4DCEF', background: '#F7F3FB', color: '#7A66B8', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(90,60,110,.14)' }}
+                    >
+                      <Icon name="rotate" size={15} />
+                    </button>
                     <button
                       aria-label="更多操作"
                       onClick={(e) => { e.stopPropagation(); setMenu({ kind: 'd3', id: w.id, title: w.title }); }}
@@ -238,6 +267,20 @@ export default function WorksPage() {
               <span style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'center' }}>参数化建模 · AI 辅助</span>
             </button>
           </div>
+          <button
+            onClick={() => { setNewOpen(false); toast('创作链路已开启 · 连衣裙', 'layers'); navigate('/design/pipeline?cat=dress'); }}
+            className="row fade-in"
+            style={{ width: '100%', marginTop: 14, padding: '13px 14px', borderRadius: 16, background: PURPLE, color: '#fff', gap: 12, textAlign: 'left', boxShadow: '0 6px 16px rgba(74,56,119,.28)' }}
+          >
+            <span style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+              <Icon name="layers" size={20} />
+            </span>
+            <span className="flex-1" style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 13.5, fontWeight: 800 }}>创作链路：版片 → 3D → 交付</span>
+              <span style={{ display: 'block', marginTop: 3, fontSize: 10.5, color: 'rgba(255,255,255,.62)', lineHeight: 1.5 }}>2D 版片与 3D 样衣双向联动 · 极速验证</span>
+            </span>
+            <span style={{ color: 'rgba(255,255,255,.6)', display: 'flex' }}><Icon name="arrow-right" size={16} /></span>
+          </button>
           <div style={{ textAlign: 'center', marginTop: 14, fontSize: 11.5, color: 'var(--text-3)' }}>保存后的作品将统一收录到「我的作品」</div>
         </div>
       </Sheet>
@@ -248,6 +291,7 @@ export default function WorksPage() {
           {menu?.kind === 'd3' && menuWork3d ? (
             <>
               <MenuAction icon="edit" label="编辑参数" onClick={() => { const m = menu; setMenu(null); navigate(`/design/studio?work=${m.id}`); }} />
+              <MenuAction icon="rotate" label="2D⇄3D 联动工作台" onClick={() => { const m = menu; setMenu(null); toast('已打开 2D⇄3D 联动工作台', 'rotate'); navigate(`/design/pipeline?id=${m.id}`); }} />
               <MenuAction icon="receipt" label="生成工艺单 → 作品详情" onClick={() => { const m = menu; setMenu(null); navigate(`/design/works/${m.id}`); }} />
               <MenuAction icon="trash" label="删除" danger onClick={() => { setDel({ ...menu }); setMenu(null); }} />
             </>

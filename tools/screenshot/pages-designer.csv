@@ -8,3 +8,5 @@
 /design/tryon,tryon
 /design/works,works
 /design/works/100,works-detail
+/design/pipeline?cat=dress,pipeline-2d
+/design/pipeline?cat=dress&stage=3d,pipeline-3d

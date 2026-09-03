@@ -54,9 +54,9 @@ function anchors(p: DesignParams, body?: Body | null): Anchors {
   return {
     collarTopY, shoulderY, armholeY, waistY, hipY, hemY,
     neckHalf: 15, shoulderHalf: bustHalf * 1.16 + (dropped ? 9 : 0),
-    bustHalf, waistHalf: bustHalf * f.w,
+    bustHalf, waistHalf: bustHalf * f.w * (p.waistMul ?? 1),
     hipHalf: bustHalf * (p.category === 'skirt' ? 1.62 : 1.1) + hipOff,
-    hemHalf: p.category === 'skirt' ? bustHalf * 2.15 : (bustHalf * f.hm * skirtFlare) * leg,
+    hemHalf: (p.category === 'skirt' ? bustHalf * 2.15 : (bustHalf * f.hm * skirtFlare) * leg) * (p.hemMul ?? 1),
     scale,
   };
 }

@@ -153,6 +153,10 @@ export interface DesignParams {
   printPos: string;
   fabric: string; color: string; pattern: string; accent: string;
   drape: number; gloss: number; stretch: number;
+  /** 2D版片⇄3D 联动连续量：腰围松量系数（0.8-1.35，1=合体基准） */
+  waistMul: number;
+  /** 2D版片⇄3D 联动连续量：下摆摆量系数（0.85-1.7） */
+  hemMul: number;
 }
 
 export const LENGTH_RANGE: Record<CategoryKey, { min: number; max: number; def: number }> = {
@@ -181,6 +185,7 @@ function defParams(category: CategoryKey, fabric = 'cotton', color = '#F5EFE6'):
     ornament: 'none', lining: 'none', stitch: 'hidden', buttons: 'none', zipper: 'none',
     printPos: 'full', fabric, color, pattern: 'none', accent: '#C2544E',
     drape: 0.5, gloss: 0.3, stretch: 0.2,
+    waistMul: 1, hemMul: 1,
   };
 }
 

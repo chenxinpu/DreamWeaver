@@ -3,7 +3,7 @@
  * 品牌区 → 双主入口卡 → 最近项目(3D稿×3 + 2D稿×2 混合)
  * → 模板速建 → AI 灵感工坊 → 本周趋势瀑布流 → 新手 3 步指南
  * ========================================================= */
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../../components/Icon';
 import type { IconName } from '../../../components/Icon';
@@ -11,6 +11,7 @@ import { Sheet, useToast } from '../../../components/Sheet';
 import { SectionHeader, Tag } from '../../../components/ui';
 import DesignerNav from '../../../components/design/DesignerNav';
 import { CATEGORY_LABELS } from '../../../data/design';
+import type { CategoryKey } from '../../../data/design';
 import { useDesignWorks } from '../../../utils/designStore';
 import type { DesignWork } from '../../../utils/designStore';
 import { useSketchWorks } from '../../../utils/sketchStore';
@@ -35,6 +36,24 @@ const QUICK: { label: string; icon: IconName; grad: string; flip?: boolean }[] =
   { label: '裤装', icon: 'pants', grad: 'linear-gradient(135deg,#8FA3B8,#5C7189)' },
   { label: '人模正面', icon: 'user', grad: 'linear-gradient(135deg,#8D7CC0,#5B4791)' },
   { label: '人模背面', icon: 'user', grad: 'linear-gradient(135deg,#6E5AA8,#3C2E5E)', flip: true },
+];
+
+/** 创作链路 4 步流程条（灵感 → 2D 版片 → 3D 联动 → 交付） */
+const PIPELINE_STEPS: { label: string; icon: IconName }[] = [
+  { label: '灵感', icon: 'sparkle' },
+  { label: '2D版片', icon: 'scissors' },
+  { label: '3D联动', icon: 'dress' },
+  { label: '交付工件稿', icon: 'receipt' },
+];
+
+/** 创作链路可选品类（6 品类网格） */
+const PIPELINE_CATS: { key: CategoryKey; icon: IconName; grad: string }[] = [
+  { key: 'dress', icon: 'dress', grad: 'linear-gradient(135deg,#F27BA0,#D44771)' },
+  { key: 'shirt', icon: 'tshirt', grad: 'linear-gradient(135deg,#7FA8D9,#4A78B5)' },
+  { key: 'skirt', icon: 'skirt', grad: 'linear-gradient(135deg,#E4AE55,#C48A2A)' },
+  { key: 'coat', icon: 'jacket', grad: 'linear-gradient(135deg,#8FA3B8,#5C7189)' },
+  { key: 'pants', icon: 'pants', grad: 'linear-gradient(135deg,#6E5AA8,#4A3877)' },
+  { key: 'suit', icon: 'layers', grad: 'linear-gradient(135deg,#8D7CC0,#5B4791)' },
 ];
 
 /** 本周趋势灵感（瀑布流 10 张） */
@@ -70,6 +89,7 @@ export default function HomePage() {
   const { works: sketchWorks } = useSketchWorks();
 
   const [guide, setGuide] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
   const [collected, setCollected] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     for (const t of TRENDS) init[t.img] = isIn(K.favs, `trend:${t.img}`);
@@ -146,11 +166,47 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ============ 创作链路 Hero（2D 版片 ⇄ 3D 样衣） ============ */}
+        <div className="fade-in" style={{ marginTop: 16, borderRadius: 20, background: WORKBENCH, padding: '15px 15px 13px', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+          <Icon name="scissors" size={118} style={{ position: 'absolute', right: -20, top: -26, opacity: .06 }} />
+          <Icon name="receipt" size={40} style={{ position: 'absolute', right: 8, bottom: -10, opacity: .07 }} />
+          <div style={{ fontSize: 15.5, fontWeight: 800, letterSpacing: .3 }}>从 2D 版片到 3D 样衣的创作链路</div>
+          <div style={{ marginTop: 5, fontSize: 11, color: 'rgba(255,255,255,.72)', lineHeight: 1.6 }}>
+            改版片，3D 同步；改 3D，版片同步 —— 极速验证，减少实物样衣
+          </div>
+
+          {/* 4 步流程条 */}
+          <div className="row" style={{ marginTop: 13, alignItems: 'center' }}>
+            {PIPELINE_STEPS.map((s, i) => (
+              <Fragment key={s.label}>
+                <div className="row" style={{ gap: 5 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+                    <Icon name={s.icon} size={13} />
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(255,255,255,.92)', whiteSpace: 'nowrap' }}>{s.label}</span>
+                </div>
+                {i < PIPELINE_STEPS.length - 1 && (
+                  <span style={{ flex: 1, minWidth: 6, height: 1.5, margin: '0 6px', borderRadius: 2, background: 'rgba(255,255,255,.24)' }} />
+                )}
+              </Fragment>
+            ))}
+          </div>
+
+          {/* 开始创作 → 品类选择 */}
+          <button
+            onClick={() => setCatOpen(true)}
+            className="row"
+            style={{ width: '100%', marginTop: 13, gap: 6, justifyContent: 'center', padding: '10px 0', borderRadius: 99, background: '#fff', color: '#4A3877', fontSize: 13.5, fontWeight: 800, boxShadow: '0 6px 16px rgba(0,0,0,.22)' }}
+          >
+            <Icon name="sparkle" size={15} />开始创作<Icon name="arrow-right" size={14} />
+          </button>
+        </div>
+
         {/* ============ 双主入口卡 ============ */}
-        <div className="row" style={{ gap: 12, marginTop: 16, alignItems: 'stretch' }}>
+        <div className="row" style={{ gap: 12, marginTop: 14, alignItems: 'stretch' }}>
           {([
-            { icon: 'pen-tool' as IconName, grad: 'var(--brand-grad)', title: '2D 画布', desc: '在人体模板上画设计稿', hint: '手绘 · 区域上色 · 标注', to: '/design/canvas' },
-            { icon: 'dress' as IconName, grad: WORKBENCH, title: '3D 模拟', desc: '参数化建模 · 试衣验证', hint: '18 类元素 · 面料物理', to: '/design/sim3d' },
+            { icon: 'pen-tool' as IconName, grad: 'var(--brand-grad)', title: '2D 画布 · 设计手稿', desc: '创意起稿：人体模板手绘 / 填充上色', hint: '创作链路 第 2 步 · 手稿 → 2D 版片', to: '/design/canvas' },
+            { icon: 'dress' as IconName, grad: WORKBENCH, title: '3D 模拟 · 参数化工具', desc: '参数化建模 · 试衣验证', hint: '创作链路 第 3 步 · 3D 联动验证样衣', to: '/design/sim3d' },
           ]).map((e) => (
             <button
               key={e.title}
@@ -201,30 +257,39 @@ export default function HomePage() {
               const w = it.w as DesignWork;
               const status = w.status === 'synced' ? '已同步' : '草稿';
               return (
-                <button key={`d${w.id}`} onClick={() => onRecent(it)} style={{ width: '100%', textAlign: 'left' }} className="card fade-in">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 11, padding: 10 }}>
-                    <span style={{ position: 'relative', width: 52, height: 58, borderRadius: 12, background: w.params.color || '#F5EFE6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLight(w.params.color || '#fff') ? 'rgba(74,58,99,.55)' : 'rgba(255,255,255,.92)', flexShrink: 0 }}>
-                      <Icon name="dress" size={23} />
-                      {w.aiSource && (
-                        <span style={{ position: 'absolute', right: 3, bottom: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C9A23F' }}>
-                          <Icon name="sparkle" size={10} />
+                <div key={`d${w.id}`} style={{ marginBottom: 6 }}>
+                  <button onClick={() => onRecent(it)} style={{ width: '100%', textAlign: 'left' }} className="card fade-in">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 11, padding: 10 }}>
+                      <span style={{ position: 'relative', width: 52, height: 58, borderRadius: 12, background: w.params.color || '#F5EFE6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLight(w.params.color || '#fff') ? 'rgba(74,58,99,.55)' : 'rgba(255,255,255,.92)', flexShrink: 0 }}>
+                        <Icon name="dress" size={23} />
+                        {w.aiSource && (
+                          <span style={{ position: 'absolute', right: 3, bottom: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C9A23F' }}>
+                            <Icon name="sparkle" size={10} />
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex-1" style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.title}</span>
+                        <span className="row" style={{ gap: 5, marginTop: 6 }}>
+                          <Tag variant="primary">3D</Tag>
+                          {w.aiSource && <Tag variant="gold">AI</Tag>}
+                          <Tag variant={w.status === 'synced' ? 'success' : 'gray'}>{status}</Tag>
                         </span>
-                      )}
-                    </span>
-                    <span className="flex-1" style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.title}</span>
-                      <span className="row" style={{ gap: 5, marginTop: 6 }}>
-                        <Tag variant="primary">3D</Tag>
-                        {w.aiSource && <Tag variant="gold">AI</Tag>}
-                        <Tag variant={w.status === 'synced' ? 'success' : 'gray'}>{status}</Tag>
+                        <span style={{ display: 'block', marginTop: 5, fontSize: 11, color: 'var(--text-3)' }}>
+                          {CATEGORY_LABELS[w.params.category]} · {w.updatedAt}
+                        </span>
                       </span>
-                      <span style={{ display: 'block', marginTop: 5, fontSize: 11, color: 'var(--text-3)' }}>
-                        {CATEGORY_LABELS[w.params.category]} · {w.updatedAt}
-                      </span>
+                      <Icon name="chevron-right" size={16} color="var(--text-3)" />
                     </span>
-                    <Icon name="chevron-right" size={16} color="var(--text-3)" />
-                  </span>
-                </button>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toast('已打开 2D⇄3D 联动工作台', 'retweet'); navigate(`/design/pipeline?id=${w.id}`); }}
+                    className="row fade-in"
+                    style={{ gap: 4, padding: '6px 12px 2px 73px', fontSize: 11.5, fontWeight: 700, color: '#7A66B8', lineHeight: 1.4 }}
+                  >
+                    <Icon name="retweet" size={12} />打开 2D⇄3D 工作台 →
+                  </button>
+                </div>
               );
             }
             const s = it.w as SketchWork;
@@ -391,6 +456,33 @@ export default function HomePage() {
           ))}
           <div style={{ margin: '6px 0 2px', padding: '12px 14px', borderRadius: 14, background: 'var(--brand-soft)', fontSize: 12, color: 'var(--brand-deep)', lineHeight: 1.7 }}>
             💡 小提示：AI 生成的灵感初稿，可以一键「应用到 3D 模拟」继续精修，或回到画布手绘完善细节。
+          </div>
+        </div>
+      </Sheet>
+
+      {/* ============ 品类选择 Sheet（创作链路起点） ============ */}
+      <Sheet open={catOpen} onClose={() => setCatOpen(false)} title="选择品类 · 开始创作链路">
+        <div style={{ paddingBottom: 26 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
+            按品类载入默认版型，进入 手稿 → 2D 版片 → 3D 联动 → 交付 的完整创作链路
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 16 }}>
+            {PIPELINE_CATS.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => { setCatOpen(false); toast(`已进入${CATEGORY_LABELS[c.key]}创作链路`, 'layers'); navigate(`/design/pipeline?cat=${c.key}`); }}
+                className="col fade-in"
+                style={{ gap: 9, alignItems: 'center', padding: '16px 4px 13px', borderRadius: 16, border: '1px solid var(--line)', background: '#FBF9FA' }}
+              >
+                <span style={{ width: 44, height: 44, borderRadius: 14, background: c.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 6px 14px rgba(80,50,110,.18)' }}>
+                  <Icon name={c.icon} size={21} />
+                </span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{CATEGORY_LABELS[c.key]}</span>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>
+            💡 已有 3D 稿？在首页 / 作品管理的稿卡上也能一键打开 2D⇄3D 工作台
           </div>
         </div>
       </Sheet>
