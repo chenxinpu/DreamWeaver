@@ -1,0 +1,10 @@
+# 设计师App 截图/QA清单
+/design,home
+/design/canvas,canvas
+/design/canvas/edit?template=croquis-front,canvas-edit
+/design/library,library
+/design/sim3d,sim3d
+/design/studio,studio-param
+/design/tryon,tryon
+/design/works,works
+/design/works/100,works-detail
