@@ -15,6 +15,28 @@ import { evalPool } from './engine/pool';
 
 const PORT = Number(process.env.PORT || 8787);
 
+/**
+ * 游客可访问的公开接口（浏览信息流 / 商城 / 素材预览等只读能力，无需登录）。
+ * 互动（点赞/评论/下单/上架等）仍要求登录。
+ */
+function isPublicApi(req: express.Request): boolean {
+  const p = req.path;
+  const isGet = req.method === 'GET' || req.method === 'HEAD';
+  if (isGet) {
+    if (p === '/feed' || p.startsWith('/feed/')) return true;
+    if (p.startsWith('/posts/')) return true;                    // 推文详情/评论列表
+    if (p === '/mall/products' || p.startsWith('/products/')) return true; // 商城列表/详情
+    if (p === '/mall/resale') return true;                       // 二手集市公开浏览（/resale/* 仍须登录）
+    if (p === '/materials/import-help' || p.startsWith('/materials/sample-content')) return true;
+    if (/^\/materials\/\d+$/.test(p)) return true;               // 素材详情（3D/打版预览）
+    if (p === '/pool/meta' || p === '/feed/recommend/seed') return true;
+    if (p === '/health') return true;
+  }
+  // 浏览量计数对游客也允许（幂等演示用途）
+  if (req.method === 'POST' && /^\/products\/\d+\/view$/.test(p)) return true;
+  return false;
+}
+
 export function createApp(): express.Express {
   const app = express();
   // CORS 全开
@@ -27,10 +49,10 @@ export function createApp(): express.Express {
     res.json({ ok: true, data: { status: 'up', version: '2.0.0', port: PORT, time: new Date().toISOString(), entities: { users: db.users.length, posts: db.posts.length, products: db.products.length, orders: db.orders.length } } });
   });
 
-  // 鉴权（登录/切换除外）
+  // 鉴权（登录/切换 + 游客可访问的公开只读接口除外）
   app.use('/api', (req, res, next) => {
     const p = req.path;
-    if (p === '/auth/login' || p === '/auth/switch') { next(); return; }
+    if (p === '/auth/login' || p === '/auth/switch' || isPublicApi(req)) { next(); return; }
     authRequired(req, res, next);
   });
 
