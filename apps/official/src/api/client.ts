@@ -54,17 +54,25 @@ function qs(params?: Record<string, string | number | boolean | undefined | null
 }
 
 async function request<T>(method: string, path: string, body?: unknown, params?: Record<string, string | number | boolean | undefined | null>, raw?: boolean): Promise<T> {
+  // 兼容旧调用：GET/HEAD/DELETE 且第 3 参传入纯对象时，视为查询参数（查询参数不能作为请求体发送）
+  const isQueryMethod = method === 'GET' || method === 'HEAD' || method === 'DELETE';
+  let query = params;
+  let reqBody = body;
+  if (isQueryMethod && query === undefined && reqBody !== undefined && typeof reqBody === 'object' && !Array.isArray(reqBody)) {
+    query = reqBody as Record<string, string | number | boolean | undefined | null>;
+    reqBody = undefined;
+  }
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let payload: string | undefined;
-  if (body !== undefined) {
+  if (reqBody !== undefined) {
     headers['Content-Type'] = 'application/json';
-    payload = JSON.stringify(body);
+    payload = JSON.stringify(reqBody);
   }
   let res: Response;
   try {
-    res = await fetch(`/api${path}${qs(params)}`, { method, headers, body: payload });
+    res = await fetch(`/api${path}${qs(query)}`, { method, headers, body: payload });
   } catch {
     throw new ApiError(networkHint(), 'network');
   }
