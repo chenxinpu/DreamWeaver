@@ -4,7 +4,7 @@ import NavBar from '../../components/NavBar';
 import Icon from '../../components/Icon';
 import { CertBadge } from '../../components/ui';
 import { Segmented, useToast } from '../../components/Sheet';
-import { me, img } from '../../data/mock';
+import { me, img } from '../../data/courses';
 
 const CATS = ['设计基础', '面料知识', '打版技巧', '软件操作', '趋势分析', '品牌运营'];
 const COVERS = [img('style-02.jpg'), img('dress-01.jpg'), img('craft-01.jpg'), img('fabric-01.jpg'), img('style-17.jpg')];

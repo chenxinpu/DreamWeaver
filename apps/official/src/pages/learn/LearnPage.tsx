@@ -5,8 +5,8 @@ import Icon from '../../components/Icon';
 import { Avatar, Tag, SectionHeader, EmptyState } from '../../components/ui';
 import { useToast } from '../../components/Sheet';
 import { useLocalState } from '../../utils/store';
-import { courses, me, userById, img } from '../../data/mock';
-import type { Course } from '../../data/types';
+import { courses, me, userById, img } from '../../data/courses';
+import type { Course } from '../../data/courses';
 
 const DEFAULT_PROGRESS: Record<number, number> = { 201: 1620, 202: 576 };
 const CATS = ['全部', '设计基础', '面料知识', '打版技巧', '软件操作', '趋势分析', '品牌运营'];
@@ -69,6 +69,7 @@ export default function LearnPage() {
   return (
     <div className="page">
       <NavBar
+        back
         title="学习中心"
         right={
           <button onClick={goUpload} className="row" style={{ gap: 4, color: 'var(--brand)', fontWeight: 600, fontSize: 13.5, padding: '4px 8px' }}>

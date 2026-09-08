@@ -13,7 +13,9 @@ export type IconName =
   | 'lock' | 'gift' | 'headphones' | 'award' | 'store' | 'refresh' | 'sun' | 'moon'
   | 'coffee' | 'beach' | 'grid' | 'zoom-in' | 'zoom-out' | 'rotate' | 'scissors'
   | 'tshirt' | 'skirt' | 'jacket' | 'pants' | 'dress' | 'hat' | 'copy' | 'phone'
-  | 'logout' | 'download' | 'image' | 'receipt' | 'note' | 'history' | 'pen-tool';
+  | 'logout' | 'download' | 'image' | 'receipt' | 'note' | 'history' | 'pen-tool'
+  | 'menu' | 'compass' | 'discount' | 'sort' | 'wallet-filled'
+  | 'external' | 'megaphone' | 'ban' | 'trending' | 'wand';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: <><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></>,
@@ -105,6 +107,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
   note: <><path d="M5 4h14v12l-5 4H5z"/><path d="M8 9h8M8 13h5"/></>,
   history: <><path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v4h4M12 8v4l3 2"/></>,
   'pen-tool': <><path d="M12 19l7-7-3-3-7 7-1 4z"/><path d="m18 13-3-3M10 8a2 2 0 1 0-4 0c0 1 .8 1.5 2 2.5M6 8c0-3 1-5 4-5"/></>,
+  menu: <><path d="M4 6.5h16M4 12h16M4 17.5h16"/></>,
+  compass: <><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></>,
+  discount: <><path d="M9 5 5 9l10 10 4-4z"/><path d="M7.5 11h.01M13.5 17h.01"/></>,
+  sort: <><path d="M8 4v13m0 0-3-3m3 3 3-3M16 20V7m0 0-3 3m3-3 3 3"/></>,
+  'wallet-filled': <><path d="M4 7a2 2 0 0 1 2-2h13v14H6a2 2 0 0 1-2-2z" fill="none" strokeWidth="1.8"/><path d="M16 11h5v3h-5a1.5 1.5 0 0 1 0-3z" fill="currentColor" stroke="none"/></>,
+  external: <><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></>,
+  megaphone: <><path d="M4 11v3a1 1 0 0 0 1 1h2l1.5 4h3l-1-4H19a2 2 0 0 0 2-2v-2"/><path d="M4 11V8l16-3v6z"/><path d="M4 11h2"/><path d="M10.5 7v4" strokeWidth="1.4"/></>,
+  ban: <><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></>,
+  trending: <><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></>,
+  wand: <><path d="m4 20 11-11"/><path d="M15 4l1 2.5L18.5 8 21 9l-2.5 1L17 12.5 16 15l-1-2.5L12.5 10 10 9l2.5-1L15 5.5z"/></>,
 };
 
 interface IconProps {

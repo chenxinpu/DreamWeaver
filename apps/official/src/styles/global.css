@@ -156,3 +156,77 @@ img { display: block; max-width: 100%; }
 
 /* 下拉刷新占位（模拟） */
 .sim-pull { text-align: center; color: var(--text-3); font-size: 12px; padding: 8px 0; }
+
+/* ============ V2 追加（在保留 V1 token 基础上的扩展，勿推翻上方案例） ============ */
+
+/* 旋转动画（loading / 自转） */
+@keyframes zmSpin { to { transform: rotate(360deg); } }
+
+/* 顶部吸顶渐变条（首页头部区） */
+.grad-top {
+  background: linear-gradient(135deg, #F27BA0 0%, #E85C87 60%, #D44771 100%);
+  color: #fff;
+}
+
+/* 通用分段 tab（粘性） */
+.sticky-tabs {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(246, 244, 241, .92);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+
+/* 手机布局下通用操作条（底部悬浮） */
+.safe-bottom-pad { padding-bottom: calc(var(--safe-bottom) + 6px); }
+
+/* 内容行点击动效 */
+.tap-row { transition: opacity .12s ease, transform .12s ease; }
+.tap-row:active { opacity: .82; transform: scale(.992); }
+
+/* 双列瀑布（商城/信息流通用） */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* 覆盖图遮罩上的价格/徽标 */
+.price-on-img { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.4); }
+
+/* 骨架占位（图片） */
+.img-ph { background: linear-gradient(120deg, #F0EAE6 30%, #F7F3F0 50%, #F0EAE6 70%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* 底部留白（无底部导航的整页滚动时底部呼吸空间） */
+.page-bleed { padding-bottom: calc(var(--safe-bottom) + 28px); }
+
+/* 三态区块通用容器 */
+.state-box { min-height: 46vh; display: flex; align-items: center; justify-content: center; }
+
+/* 导航/头部下的内容区顶部内边距快捷类 */
+.pt-safe { padding-top: max(env(safe-area-inset-top), 0px); }
+
+/* 步骤条（私人定制向导 / 订单流程） */
+.steps { display: flex; align-items: center; }
+.step-dot { width: 26px; height: 26px; border-radius: 50%; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step-line { flex: 1; height: 2px; border-radius: 2px; margin: 0 6px; min-width: 12px; }
+.step-label { font-size: 10.5px; margin-top: 4px; text-align: center; }
+
+/* 通用输入 */
+.f-input {
+  width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; font-size: 14px; outline: none; transition: border-color .15s ease;
+}
+.f-input:focus { border-color: var(--brand); background: #fff; }
+.f-label { font-size: 13px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+
+/* 详情页信息条（格纹行） */
+.kv-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px dashed #F0E9E4; font-size: 13px; }
+.kv-row:last-child { border-bottom: none; }
+.kv-key { color: var(--text-3); }
+.kv-val { color: var(--text); font-weight: 500; text-align: right; max-width: 68%; }
+
+/* 折叠面板 */
+.collapse-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 13px 0; cursor: pointer; }
+.collapse-bd { overflow: hidden; transition: max-height .2s ease; }
+
+/* 数字角标 */
+.badge-dot { position: absolute; min-width: 16px; height: 16px; border-radius: 99px; background: #FF3B30; color: #fff; font-size: 9.5px; line-height: 16px; text-align: center; padding: 0 4px; font-weight: 700; }
+
+/* 富文本换行 */
+.whitespace-pre { white-space: pre-wrap; word-break: break-word; }

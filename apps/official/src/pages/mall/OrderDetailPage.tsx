@@ -1,383 +1,240 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+/* ============================================================================
+ * /mall/orders/:id 订单详情 —— 时间轴 / 生产阶段 / 质检 / 物流 / 操作
+ * 操作：去支付 · dev-advance(演示推进) · 确认收货 · 取消(direct 未发货) · 退货/换货(定制)
+ * ==========================================================================*/
+import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import Icon, { type IconName } from '../../components/Icon';
-import NavBar from '../../components/NavBar';
-import { Price, EmptyState, Tag } from '../../components/ui';
+import Icon from '../../components/Icon';
 import { Sheet, useToast } from '../../components/Sheet';
-import { useLocalState, useCart } from '../../utils/store';
-import { orders, workById } from '../../data/mock';
-import type { Order } from '../../data/types';
+import { api } from '../../api/client';
+import type { Order, OrderStatus } from '../../api/types';
+import { Loading, ErrorBox, fmtMoney, hideBadImg, imgSafe, relTime } from '../../components/shared/utils';
 
-/* 合并本地订单与 mock 订单（本地在前），支持对任意订单打补丁（状态变更） */
-function useOrders() {
-  const [local, setLocal] = useLocalState<Order[]>('zm_orders', []);
-  const [patches, setPatches] = useLocalState<Record<string, Partial<Order>>>('zm_order_patches', {});
-  const all = useMemo(() => {
-    const apply = (o: Order): Order => {
-      const p = patches[String(o.id)];
-      return p ? { ...o, ...p } : o;
-    };
-    return [...local, ...orders].map(apply);
-  }, [local, patches]);
-  const patchOrder = (id: number, patch: Partial<Order>) => {
-    if (local.some((o) => o.id === id)) {
-      setLocal((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
-    } else {
-      setPatches((prev) => ({ ...prev, [String(id)]: { ...(prev[String(id)] || {}), ...patch } }));
-    }
-  };
-  return { all, patchOrder, setLocal };
-}
+const ORDER_TEXT: Record<OrderStatus, string> = {
+  created: '待支付', paid: '待生产', producing: '生产中', qc: '质检中',
+  shipping: '已发货', received: '已收货', completed: '已完成', cancelled: '已取消',
+};
 
-/* ---------- 状态时间轴 8 节点 ---------- */
-const NODES: { label: string; icon: IconName }[] = [
-  { label: '待支付', icon: 'wallet' },
-  { label: '待生产', icon: 'clock' },
-  { label: '生产中', icon: 'scissors' },
-  { label: '质检中', icon: 'shield' },
-  { label: '待发货', icon: 'package' },
-  { label: '已发货', icon: 'truck' },
-  { label: '已收货', icon: 'check-circle' },
-  { label: '已完成', icon: 'star' },
-];
-
-/* 各节点时间（mock：按下单时间推算） */
-function nodeTimes(order: Order): string[] {
-  const base = new Date(order.createdAt.replace(' ', 'T'));
-  if (Number.isNaN(base.getTime())) return NODES.map(() => '—');
-  const off = [0, 2, 26, 50, 74, 98, 122, 146];
-  const p2 = (n: number) => String(n).padStart(2, '0');
-  return off.map((h) => {
-    const d = new Date(base.getTime() + h * 3600 * 1000);
-    return `${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
-  });
-}
-
-/* 生产环节 */
-const STAGES = ['设计稿确认', '面料采购', '裁剪', '缝制', '整烫', '质检'];
-
-function Thumb({ src, size = 48 }: { src: string; size?: number }) {
-  const [err, setErr] = useState(false);
-  if (!src || err) {
-    return <div style={{ width: size, height: size * 1.2, borderRadius: 8, background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="bag" size={18} color="var(--text-3)" /></div>;
-  }
-  return <img src={src} alt="" style={{ width: size, height: size * 1.2, borderRadius: 8, objectFit: 'cover' }} onError={() => setErr(true)} />;
-}
-
-export default function OrderDetailPage() {
+export default function MallOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const { all, patchOrder, setLocal } = useOrders();
-  const { add } = useCart();
+  const [o, setO] = React.useState<Order | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
+  const [busy, setBusy] = React.useState('');
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [paySheet, setPaySheet] = React.useState(false);
 
-  const order = useMemo(() => all.find((o) => String(o.id) === id), [all, id]);
+  const load = React.useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const od = await api.orders.get(id || '0');
+      setO(od);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally { setLoading(false); }
+  }, [id]);
 
-  const [qcImg, setQcImg] = useState<string | null>(null);
-  const logiRef = useRef<HTMLDivElement>(null);
+  React.useEffect(() => { load(); }, [load]);
 
-  /* 进度条动画 */
-  const pct = order?.progress?.percent ?? 0;
-  const [barW, setBarW] = useState(0);
-  useEffect(() => {
-    setBarW(0);
-    const t = window.setTimeout(() => setBarW(pct), 80);
-    return () => window.clearTimeout(t);
-  }, [pct, id]);
-
-  const copy = (text: string, msg: string) => {
-    try { navigator.clipboard?.writeText(text); } catch { /* ignore */ }
-    toast(msg);
+  const act = async (fn: () => Promise<Order>, key: string, okText: string) => {
+    setBusy(key);
+    try {
+      const updated = await fn();
+      setO(updated);
+      toast(okText, 'check');
+    } catch (e) {
+      toast((e as Error).message || '操作失败');
+    } finally { setBusy(''); }
   };
 
-  if (!order) {
+  if (loading) return <div className="page no-tab"><OrderNav id={id} /><Loading text="加载订单…" /></div>;
+  if (error || !o) {
     return (
-      <div className="page no-tab">
-        <NavBar back title="订单详情" />
-        <EmptyState icon="package" title="订单不存在" desc="该订单可能已被删除" action={<button className="btn btn-primary" onClick={() => navigate('/orders')}>返回订单列表</button>} />
+      <div className="page no-tab page-bleed">
+        <OrderNav id={id} />
+        <div className="state-box"><ErrorBox msg={error || '订单不存在'} onRetry={load} /></div>
       </div>
     );
   }
 
-  const times = nodeTimes(order);
-  const stageIdx = Math.max(0, STAGES.findIndex((s) => (order.progress?.stage || '').includes(s)));
-  const hasBottomBar = order.status !== 1 && order.status !== 3 && order.status !== 4;
+  const { timeline = [], stage, qcReport, logistics, returnReq, amounts, specUsed } = o;
+  const inProd = ['paid', 'producing', 'qc'].includes(o.status);
+  const canCancel = o.status === 'created';
+  const canConfirm = o.status === 'shipping';
+  const canReturn = o.kind === 'custom' && o.status === 'received' && (!returnReq || returnReq.state === 'none');
 
   return (
-    <div className="page no-tab" style={{ paddingBottom: hasBottomBar ? 110 : 24 }}>
-      <NavBar
-        back
-        title="订单详情"
-        right={<button onClick={() => toast('更多功能开发中')} style={{ padding: 6 }}><Icon name="more" size={20} /></button>}
-      />
-      <div className="page-body">
-        {/* 状态时间轴 */}
-        <div className="card" style={{ padding: '16px 16px 4px', marginBottom: 12 }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>订单状态</div>
-          <div style={{ marginTop: 10 }}>
-            {NODES.map((n, i) => {
-              const done = i < order.status;
-              const cur = i === order.status;
-              return (
-                <div key={n.label} className="row" style={{ alignItems: 'flex-start' }}>
-                  <div className="col" style={{ alignItems: 'center', width: 44, flexShrink: 0 }}>
-                    <div style={{
-                      width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: done ? 'var(--success)' : cur ? 'var(--brand-grad)' : '#F1EDE9',
-                      color: '#fff', boxShadow: cur ? '0 0 0 4px var(--brand-soft)' : 'none', transition: 'all .3s ease',
-                    }}>
-                      {done ? <Icon name="check" size={14} strokeWidth={3} /> : <Icon name={n.icon} size={13} color={cur ? '#fff' : 'var(--text-3)'} />}
-                    </div>
-                    {i < NODES.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 22, background: i < order.status ? 'var(--success)' : 'var(--line)' }} />}
-                  </div>
-                  <div style={{ flex: 1, padding: '0 0 18px' }}>
-                    <div className="row" style={{ gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: cur ? 700 : 600, color: cur ? 'var(--brand)' : done ? 'var(--text)' : 'var(--text-3)' }}>{n.label}</span>
-                      {cur && <Tag variant="primary">当前</Tag>}
-                      {done && <Icon name="check-circle" size={15} color="var(--success)" />}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>{i <= order.status ? times[i] : '—'}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+    <div className="mall-page no-tab page-bleed" style={{ minHeight: '100dvh', background: '#F4F5F7', paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
+      <OrderNav id={id} />
+      {/* 顶部状态卡 */}
+      <div style={{ margin: '2px 12px 10px', borderRadius: 16, overflow: 'hidden', color: '#fff', background: 'linear-gradient(120deg,#F27BA0,#E85C87 60%,#C93E6B)', padding: '15px 16px' }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, opacity: .9 }}>{o.kind === 'custom' ? '私人定制订单' : '现货直购订单'}</span>
+          <span style={{ background: 'rgba(255,255,255,.2)', borderRadius: 99, padding: '2px 10px', fontSize: 11.5, fontWeight: 700 }}>{ORDER_TEXT[o.status]}</span>
         </div>
+        <div style={{ fontSize: 23, fontWeight: 800, marginTop: 10 }}>¥{fmtMoney(amounts?.total ?? 0)}</div>
+        <div style={{ fontSize: 11, opacity: .9, marginTop: 4 }}>{o.no} · {relTime(o.createdAt)} 下单</div>
+      </div>
 
-        {/* 生产进度 */}
-        {(order.status === 1 || order.status === 2 || order.status === 3) && (
-          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>生产进度</div>
-              <Tag variant="primary" icon="scissors">{order.progress?.stage || '生产中'}</Tag>
-            </div>
-            <div className="row" style={{ gap: 14, margin: '14px 0 12px' }}>
-              <span style={{ fontSize: 34, fontWeight: 800, color: 'var(--brand)', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
-              <div className="flex-1">
-                <div style={{ height: 10, borderRadius: 99, background: 'var(--bg-deep)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, background: 'var(--brand-grad)', width: `${barW}%`, transition: 'width 1s cubic-bezier(.22,1,.36,1)' }} />
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6 }}>{order.progress?.eta || '—'} · C2M 柔性产线按单生产</div>
-              </div>
-            </div>
-            <div className="row" style={{ alignItems: 'flex-start' }}>
-              {STAGES.map((s, i) => (
-                <span key={s} style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  {i < STAGES.length - 1 && (
-                    <span style={{
-                      position: 'absolute', top: 7, left: 'calc(50% + 8px)', right: 'calc(-50% + 8px)', height: 2,
-                      background: i < stageIdx ? 'var(--brand)' : 'var(--line)', borderRadius: 1,
-                    }} />
-                  )}
-                  <span style={{
-                    width: 14, height: 14, borderRadius: '50%', position: 'relative', zIndex: 1,
-                    background: i < stageIdx ? 'var(--brand-soft)' : i === stageIdx ? 'var(--brand-grad)' : '#F1EDE9',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: i === stageIdx ? '0 0 0 3px var(--brand-soft)' : 'none',
-                  }}>
-                    {i < stageIdx && <Icon name="check" size={9} color="var(--brand)" strokeWidth={3.5} />}
-                  </span>
-                  <span style={{
-                    fontSize: 10, whiteSpace: 'nowrap', color: i === stageIdx ? 'var(--brand)' : i < stageIdx ? 'var(--text-2)' : 'var(--text-3)',
-                    fontWeight: i === stageIdx ? 700 : 400,
-                  }}>{s}</span>
-                </span>
-              ))}
-            </div>
+      {/* 商品卡 */}
+      <div className="card" style={{ margin: '0 12px 10px', borderRadius: 14, padding: 12 }}>
+        <div className="row" style={{ gap: 10 }}>
+          <div className="img-ph" style={{ width: 66, height: 78, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+            <img src={imgSafe(o.cover)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={hideBadImg} />
           </div>
-        )}
-
-        {/* 质检报告 */}
-        {order.status >= 3 && order.qc && (
-          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>质检报告</div>
-              {order.qc.pass ? <Tag variant="success" icon="check-circle">质检通过</Tag> : <Tag variant="danger">未通过</Tag>}
+          <div className="flex-1" style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.4 }}>{o.productTitle}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4 }}>
+              {o.kind === 'custom' ? '定制规格（按体型调整）' : `直购尺码：${specUsed?.size || 'M'}`}
             </div>
-            <div style={{ marginTop: 6 }}>
-              {([
-                ['面料检测', order.qc.fabric],
-                ['工艺检测', order.qc.craft],
-                ['尺寸偏差', order.qc.sizeDeviation],
-              ] as const).map(([label, text]) => (
-                <div key={label} className="row" style={{ gap: 8, padding: '7px 0' }}>
-                  <Icon name="check-circle" size={17} color="var(--success)" />
-                  <span style={{ fontSize: 12.5, color: 'var(--text-2)', flex: 1 }}><span style={{ fontWeight: 600 }}>{label}：</span>{text}</span>
-                </div>
-              ))}
-            </div>
-            <div className="row" style={{ gap: 8, marginTop: 8 }}>
-              {order.qc.images.map((s, i) => (
-                <button key={i} onClick={() => setQcImg(s)} style={{ borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                  <img src={s} alt="" style={{ width: 64, height: 64, objectFit: 'cover', display: 'block' }} />
-                </button>
-              ))}
-              <span style={{ fontSize: 11.5, color: 'var(--text-3)', alignSelf: 'center' }}>点击查看大图</span>
-            </div>
+            {o.kind === 'custom' && amounts && (
+              <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 3 }}>原价 ¥{amounts.price} + 基础费用 ¥{amounts.baseFee}</div>
+            )}
           </div>
-        )}
-
-        {/* 物流信息 */}
-        {order.status >= 5 && order.logistics && (
-          <div className="card" style={{ padding: 16, marginBottom: 12 }} ref={logiRef}>
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>物流信息</div>
-              <Tag variant="gray" icon="truck">{order.logistics.company}</Tag>
-            </div>
-            <div className="row" style={{ gap: 8, margin: '10px 0 4px', background: 'var(--bg-deep)', borderRadius: 10, padding: '9px 12px' }}>
-              <span style={{ fontSize: 13, flex: 1 }}>运单号 <span style={{ fontWeight: 700 }}>{order.logistics.trackingNo}</span></span>
-              <button onClick={() => copy(order.logistics!.trackingNo, '运单号已复制')} className="row" style={{ gap: 3, fontSize: 12, color: 'var(--brand)' }}>
-                <Icon name="link" size={13} />复制
-              </button>
-            </div>
-            <div style={{ marginTop: 6 }}>
-              {order.logistics.traces.map((t, i) => (
-                <div key={i} className="row" style={{ alignItems: 'flex-start', gap: 10 }}>
-                  <div className="col" style={{ alignItems: 'center', width: 10, flexShrink: 0 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: i === 0 ? 'var(--brand)' : 'var(--line)', marginTop: 5 }} />
-                    {i < order.logistics!.traces.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 20, background: 'var(--line)' }} />}
-                  </div>
-                  <div style={{ flex: 1, paddingBottom: 14 }}>
-                    <div style={{ fontSize: 13, fontWeight: i === 0 ? 600 : 400 }}>{t.text}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>{t.time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 订单信息 */}
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>订单信息</div>
-          <div style={{ marginTop: 4 }}>
-            <div className="row" style={{ justifyContent: 'space-between', padding: '7px 0' }}>
-              <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>订单号</span>
-              <button className="row" style={{ gap: 5, fontSize: 12.5 }} onClick={() => copy(order.orderNo, '订单号已复制')}>
-                <span className="ellipsis" style={{ maxWidth: 170 }}>{order.orderNo}</span>
-                <Icon name="link" size={13} color="var(--brand)" />
-              </button>
-            </div>
-            <div className="row" style={{ justifyContent: 'space-between', padding: '7px 0' }}>
-              <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>下单时间</span>
-              <span style={{ fontSize: 12.5 }}>{order.createdAt}</span>
-            </div>
-            <div className="row" style={{ justifyContent: 'space-between', padding: '7px 0', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>收货信息</span>
-              <span style={{ fontSize: 12.5, textAlign: 'right', maxWidth: 240 }}>
-                {order.address.name} {order.address.phone}<br />{order.address.region} {order.address.detail}
-              </span>
-            </div>
-          </div>
-          <div className="divider" style={{ margin: '8px 0' }} />
-          {order.items.map((it) => (
-            <div key={it.workId} className="row" style={{ gap: 10, padding: '7px 0' }}>
-              <Thumb src={it.cover} size={44} />
-              <div className="flex-1" style={{ minWidth: 0 }}>
-                <div className="ellipsis" style={{ fontSize: 13, fontWeight: 600 }}>{it.title}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>{it.color} · {it.size} · ×{it.qty}</div>
-              </div>
-              <Price value={it.price} size={13.5} />
-            </div>
-          ))}
-        </div>
-
-        {/* 售后保障 */}
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>售后保障</div>
-          {order.isCustom ? (
-            <div className="row" style={{ gap: 6, marginTop: 10, padding: 10, borderRadius: 10, background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: 12.5 }}>
-              <Icon name="lock" size={14} style={{ marginTop: 1 }} />
-              定制商品不支持无理由退货，仅质量问题可申请售后
-            </div>
-          ) : (
-            <div className="row" style={{ gap: 6, marginTop: 10, padding: 10, borderRadius: 10, background: 'var(--success-soft)', color: 'var(--success)', fontSize: 12.5 }}>
-              <Icon name="shield" size={14} style={{ marginTop: 1 }} />
-              支持七天无理由退货（不影响二次销售）
-            </div>
-          )}
-          <button className="btn btn-outline btn-sm" style={{ marginTop: 12 }} onClick={() => navigate(`/orders/${order.id}/aftersale`)}>申请售后</button>
         </div>
       </div>
 
-      {/* 质检图片大图 */}
-      <Sheet open={!!qcImg} onClose={() => setQcImg(null)} title="质检图片">
-        {qcImg && <img src={qcImg} alt="" style={{ width: '100%', borderRadius: 12 }} />}
-      </Sheet>
-
-      {/* 底部操作栏 */}
-      {hasBottomBar && (
-        <div style={{
-          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-          width: '100%', maxWidth: 430, zIndex: 90,
-          background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(12px)',
-          borderTop: '1px solid var(--line)',
-          padding: '10px 16px calc(var(--safe-bottom) + 10px)',
-          display: 'flex', alignItems: 'center', gap: 10,
-        }}>
-          {order.status === 0 && (
-            <>
-              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>应付 <Price value={order.amount} size={20} /></span>
-              <div className="flex-1" />
-              <button
-                className="btn btn-sm btn-ghost"
-                onClick={() => {
-                  setLocal((prev) => prev.filter((l) => l.id !== order.id));
-                  toast('订单已取消');
-                  navigate('/orders');
-                }}
-              >取消订单</button>
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => {
-                  patchOrder(order.id, { status: 2, progress: { stage: '裁剪中', percent: 12, eta: '预计 5 天后完成' } });
-                  toast('支付成功，订单进入生产');
-                  navigate('/orders');
-                }}
-              >立即支付</button>
-            </>
-          )}
-          {order.status === 2 && (
-            <>
-              <div className="flex-1" />
-              <button className="btn btn-sm btn-primary" onClick={() => toast('已通知工厂，将加快生产进度')}>催一催</button>
-            </>
-          )}
-          {order.status === 5 && (
-            <>
-              <div className="flex-1" />
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => {
-                  if (order.logistics && logiRef.current) logiRef.current.scrollIntoView({ behavior: 'smooth' });
-                  else toast('暂无物流信息');
-                }}
-              >查看物流</button>
-            </>
-          )}
-          {order.status === 6 && (
-            <>
-              <div className="flex-1" />
-              <button className="btn btn-sm btn-outline" onClick={() => toast('感谢你的评价～')}>评价</button>
-              <button className="btn btn-sm btn-primary" onClick={() => { patchOrder(order.id, { status: 7 }); toast('已确认收货，订单完成'); }}>确认收货</button>
-            </>
-          )}
-          {order.status === 7 && (
-            <>
-              <div className="flex-1" />
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={() => {
-                  const it = order.items[0];
-                  const w = workById(it.workId);
-                  if (w) { add({ workId: w.id, qty: 1, color: it.color, size: it.size }); toast('已加入购物车'); }
-                }}
-              >再次购买</button>
-              <button className="btn btn-sm btn-primary" onClick={() => navigate(`/orders/${order.id}/aftersale`)}>申请售后</button>
-            </>
-          )}
+      {/* 生产阶段（进度条） */}
+      {stage && (
+        <div className="card" style={{ margin: '0 12px 10px', borderRadius: 14, padding: '12px 14px' }}>
+          <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <span className="row" style={{ gap: 5, fontSize: 13.5, fontWeight: 800 }}><Icon name="history" size={15} color="var(--brand)" />生产进度 · {stage.name}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{stage.eta}</span>
+          </div>
+          <div style={{ height: 7, borderRadius: 99, background: 'var(--bg-deep)', overflow: 'hidden' }}>
+            <div style={{ width: `${Math.min(100, stage.percent || 0)}%`, height: '100%', background: 'var(--brand-grad)', borderRadius: 99, transition: 'width .5s ease' }} />
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 6 }}>当前完成 {stage.percent || 0}%</div>
         </div>
       )}
+
+      {/* 状态时间轴 */}
+      {timeline?.length > 0 && (
+        <div className="card" style={{ margin: '0 12px 10px', borderRadius: 14, padding: '14px 16px' }}>
+          <div className="row" style={{ gap: 5, fontSize: 13.5, fontWeight: 800, marginBottom: 12 }}><Icon name="flag" size={14} color="var(--brand)" />订单动态</div>
+          {timeline.map((t, i) => {
+            const last = i === timeline.length - 1;
+            return (
+              <div key={i} style={{ display: 'flex', gap: 11, position: 'relative', paddingBottom: i === timeline.length - 1 ? 0 : 16 }}>
+                {i < timeline.length - 1 && <span style={{ position: 'absolute', left: 6, top: 16, bottom: 0, width: 2, background: last ? 'transparent' : 'var(--bg-deep)' }} />}
+                <span style={{ width: 14, height: 14, borderRadius: '50%', background: last ? 'var(--brand-grad)' : '#E5DED8', flexShrink: 0, marginTop: 2, boxShadow: last ? '0 0 0 4px var(--brand-soft)' : 'none' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: last ? 800 : 600 }}>{t.text}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 1 }}>{t.t}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 质检报告 */}
+      {qcReport && (
+        <div className="card" style={{ margin: '0 12px 10px', borderRadius: 14, padding: '12px 14px' }}>
+          <div className="row" style={{ gap: 6, fontSize: 13.5, fontWeight: 800, marginBottom: 8 }}>
+            <Icon name="shield" size={15} color={qcReport.pass ? 'var(--success)' : 'var(--danger)'} />
+            质检报告 {qcReport.pass ? '· 通过' : '· 未通过'}
+          </div>
+          {(qcReport.items || []).map((it) => (
+            <div key={it.k} className="kv-row"><span className="kv-key">{it.k}</span><span className="kv-val">{it.v}</span></div>
+          ))}
+          <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 6 }}>质检时间：{qcReport.at}</div>
+        </div>
+      )}
+
+      {/* 物流 */}
+      {logistics && (
+        <div className="card" style={{ margin: '0 12px 10px', borderRadius: 14, padding: '12px 14px' }}>
+          <div className="row" style={{ gap: 6, fontSize: 13.5, fontWeight: 800, marginBottom: 6 }}>
+            <Icon name="truck" size={15} color="var(--info)" />物流信息
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginBottom: 6 }}>{logistics.company} · {logistics.trackingNo}</div>
+          {(logistics.traces || []).slice(0, 6).map((tr, i) => (
+            <div key={i} className="row" style={{ gap: 7, fontSize: 11.5, color: 'var(--text-2)', padding: '4px 0' }}>
+              <span style={{ width: 5, height: 5, borderRadius: 99, background: i === 0 ? 'var(--success)' : '#D8D2CE', flexShrink: 0 }} />
+              <span style={{ color: i === 0 ? 'var(--success)' : undefined, fontWeight: i === 0 ? 700 : 400 }}>{tr.text}</span>
+              <span style={{ marginLeft: 'auto', color: 'var(--text-3)' }}>{tr.time}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 售后信息（定制） */}
+      {returnReq && returnReq.state !== 'none' && (
+        <div className="card" style={{ margin: '0 12px 10px', borderRadius: 14, padding: '12px 14px', border: '1px solid #F3DFB6', background: '#FFFDF6' }}>
+          <div className="row" style={{ gap: 6, fontSize: 13.5, fontWeight: 800, color: '#8A6420', marginBottom: 6 }}>
+            <Icon name="wallet" size={15} />售后记录
+          </div>
+          <div style={{ fontSize: 12, color: '#7A5B10', lineHeight: 1.9 }}>
+            {returnReq.state === 'returning' && `退货处理中：退款 ¥${returnReq.refundAmount}（基础费用 ¥${returnReq.baseFeeKept} 不退）`}
+            {returnReq.state === 'done' && `已退货：退款 ¥${returnReq.refundAmount} 已原路退回；成衣将进入二手集市${returnReq.resaleListingId ? `（挂单 #${returnReq.resaleListingId}）` : ''}`}
+            {returnReq.state === 'exchanged' && `已换货重做：原单关闭${returnReq.newOrderId ? `，新定制单 #${returnReq.newOrderId} 需再付基础费用 ¥${returnReq.baseFeeKept}` : ''}`}
+          </div>
+        </div>
+      )}
+
+      {/* 操作按钮 */}
+      <div className="mall-actionbar" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {canCancel && (
+          <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => setCancelOpen(true)}>取消订单</button>
+        )}
+        {canConfirm && (
+          <button className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => act(() => api.orders.confirmReceived(o.id), 'confirm', '已确认收货')}>确认收货</button>
+        )}
+        {inProd && (
+          <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => act(() => api.orders.devAdvance(o.id), 'adv', '演示：已推进到下一生产节点')}>
+            <Icon name="refresh" size={13} />演示推进（dev-advance）
+          </button>
+        )}
+        {canReturn && (
+          <>
+            <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => navigate(`/mall/orders/${o.id}/return`)}>申请退货</button>
+            <button className="btn btn-danger-soft btn-sm" disabled={!!busy} onClick={() => navigate(`/mall/orders/${o.id}/exchange`)}>换货重做</button>
+          </>
+        )}
+        {o.status === 'created' && (
+          <button className="btn btn-primary btn-sm" onClick={() => setPaySheet(true)}>去支付 ¥{fmtMoney(amounts?.total ?? 0)}</button>
+        )}
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/mall/orders')}>返回列表</button>
+      </div>
+
+      {/* 支付确认（演示） */}
+      <Sheet open={paySheet} onClose={() => setPaySheet(false)} title="订单支付">
+        <div style={{ textAlign: 'center', padding: '14px 0 20px' }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>订单金额</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--brand-deep)', marginTop: 6 }}>¥{fmtMoney(amounts?.total ?? 0)}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>演示环境：模拟支付，余额充足直接成功</div>
+          <button className="btn btn-primary btn-block btn-lg" style={{ marginTop: 18 }} disabled={busy === 'pay'} onClick={() => act(() => api.orders.pay(o.id), 'pay', '支付成功')}>
+            确认支付
+          </button>
+        </div>
+      </Sheet>
+
+      {/* 取消确认 */}
+      <Sheet open={cancelOpen} onClose={() => setCancelOpen(false)} title="取消订单">
+        <div style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.9, padding: '6px 0' }}>
+          取消后金额将全额原路退回；{o.kind === 'custom' ? '定制订单仅支付前可取消。' : '该订单为现货直购，未发货可全额退。'}
+        </div>
+        <button className="btn btn-danger btn-block" style={{ margin: '12px 0 18px' }} disabled={!!busy} onClick={async () => {
+          setCancelOpen(false);
+          await act(() => api.orders.cancel(o.id), 'cancel', '订单已取消，款项已退回');
+        }}>
+          确认取消
+        </button>
+      </Sheet>
+    </div>
+  );
+}
+
+function OrderNav({ id }: { id?: string }) {
+  const navigate = useNavigate();
+  return (
+    <div className="mall-topbar" style={{ position: 'static' }}>
+      <button onClick={() => navigate(-1)} style={{ padding: 4, color: '#1F2329' }}><Icon name="arrow-left" size={20} /></button>
+      <span style={{ fontSize: 16.5, fontWeight: 800, flex: 1, textAlign: 'center' }}>订单详情 #{id}</span>
+      <span style={{ width: 28 }} />
     </div>
   );
 }

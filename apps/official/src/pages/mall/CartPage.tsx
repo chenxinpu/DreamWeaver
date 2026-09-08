@@ -1,157 +1,82 @@
-import { useMemo, useState } from 'react';
+/* ============================================================================
+ * /mall/cart 购物车（本地会话，localStorage：zm_cart_v2）
+ * ==========================================================================*/
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
-import NavBar from '../../components/NavBar';
-import { Price, EmptyState } from '../../components/ui';
 import { useToast } from '../../components/Sheet';
-import { useCart } from '../../utils/store';
-import { workById } from '../../data/mock';
-import type { CartItem, Work } from '../../data/types';
+import { useCart } from '../../utils/v2';
+import { fmtMoney, hideBadImg, imgSafe } from '../../components/shared/utils';
+import { StateNote } from './parts';
 
-/* 圆形勾选 */
-function Check({ on, onToggle, size = 20 }: { on: boolean; onToggle: () => void; size?: number }) {
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      style={{
-        width: size, height: size, borderRadius: '50%', flexShrink: 0,
-        border: on ? 'none' : '2px solid var(--line)',
-        background: on ? 'var(--brand-grad)' : '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: on ? '0 2px 6px rgba(232,92,135,.35)' : 'none',
-      }}
-      aria-label={on ? '取消选中' : '选中'}
-    >
-      {on && <Icon name="check" size={size - 8} color="#fff" strokeWidth={3} />}
-    </button>
-  );
-}
-
-/* 缩略图（onError 兜底） */
-function Thumb({ src }: { src: string }) {
-  const [err, setErr] = useState(false);
-  if (!src || err) {
-    return (
-      <div style={{ width: 74, height: 92, borderRadius: 10, background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="bag" size={22} color="var(--text-3)" />
-      </div>
-    );
-  }
-  return <img src={src} alt="" style={{ width: 74, height: 92, borderRadius: 10, objectFit: 'cover' }} onError={() => setErr(true)} />;
-}
-
-export default function CartPage() {
+export default function MallCartPage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { items, update, remove } = useCart();
-  const [manage, setManage] = useState(false);
-
-  const joined = useMemo(
-    () => items.map((i) => ({ i, w: workById(i.workId) })).filter((x): x is { i: CartItem; w: Work } => Boolean(x.w)),
-    [items],
-  );
-
-  const allChecked = joined.length > 0 && joined.every((x) => x.i.checked);
-  const selected = joined.filter((x) => x.i.checked);
-  const total = selected.reduce((s, x) => s + x.w.price * x.i.qty, 0);
-
-  const toggleAll = () => {
-    joined.forEach((x) => update(x.i.workId, { checked: !allChecked }));
-  };
+  const cart = useCart();
 
   const goCheckout = () => {
-    if (selected.length === 0) { toast('请选择商品'); return; }
-    navigate('/checkout');
+    if (!cart.checkedItems.length) { toast('请先勾选要结算的商品'); return; }
+    navigate('/mall/checkout');
   };
 
-  if (joined.length === 0) {
-    return (
-      <div className="page no-tab">
-        <NavBar back title="购物车" />
-        <EmptyState
-          icon="bag"
-          title="购物车空空如也"
-          desc="快去挑选心仪的设计作品吧"
-          action={<button className="btn btn-primary" onClick={() => navigate('/mall')}>去逛逛</button>}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="page no-tab" style={{ paddingBottom: 110 }}>
-      <NavBar
-        back
-        title="购物车"
-        right={
-          <button onClick={() => setManage((m) => !m)} style={{ fontSize: 14, fontWeight: 600, color: manage ? 'var(--brand)' : 'var(--text-2)', padding: 6 }}>
-            {manage ? '完成' : '管理'}
-          </button>
-        }
-      />
-      <div className="page-body">
-        {joined.map(({ i, w }) => {
-          const dec = () => {
-            if (i.qty <= 1) { toast('最少1件'); return; }
-            update(i.workId, { qty: i.qty - 1 });
-          };
-          return (
-            <div key={i.workId} className="card" style={{ display: 'flex', gap: 10, padding: 12, marginBottom: 10, alignItems: 'center' }}>
-              <Check on={!!i.checked} onToggle={() => update(i.workId, { checked: !i.checked })} />
-              <div onClick={() => navigate(`/work/${i.workId}`)} style={{ flexShrink: 0 }}>
-                <Thumb src={w.cover} />
-              </div>
-              <div className="flex-1">
-                <div className="ellipsis-2" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>{w.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{i.color} · {i.size}</div>
-                <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
-                  <Price value={w.price} size={15} />
-                  {manage ? (
-                    <button
-                      onClick={() => { remove(i.workId); toast('已删除'); }}
-                      style={{ width: 28, height: 28, borderRadius: 99, background: 'var(--danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Icon name="trash" size={15} color="var(--danger)" />
-                    </button>
-                  ) : (
-                    <div className="row" style={{ gap: 2 }}>
-                      <button onClick={dec} style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name="minus" size={14} />
-                      </button>
-                      <span style={{ minWidth: 30, textAlign: 'center', fontSize: 14, fontWeight: 700 }}>{i.qty}</span>
-                      <button onClick={() => update(i.workId, { qty: i.qty + 1 })} style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--brand-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name="plus" size={14} color="var(--brand)" />
-                      </button>
-                    </div>
-                  )}
+    <div className="mall-page" style={{ paddingBottom: 'calc(var(--tab-h) + var(--safe-bottom) + 30px)', background: '#F4F5F7', minHeight: '100dvh' }}>
+      <div className="mall-topbar" style={{ position: 'static' }}>
+        <button onClick={() => navigate(-1)} style={{ padding: 4, color: '#1F2329' }}><Icon name="arrow-left" size={20} /></button>
+        <span style={{ fontSize: 16.5, fontWeight: 800, flex: 1, textAlign: 'center', color: '#1F2329' }}>购物车（{cart.count}）</span>
+        <span style={{ width: 28 }} />
+      </div>
+
+      {cart.items.length === 0 ? (
+        <StateNote
+          icon="cart"
+          title="购物车还是空的"
+          desc="去挑选喜欢的商品，支持直接购买与私人定制"
+          action={<button className="btn btn-primary btn-sm" onClick={() => navigate('/mall/home')}>去逛逛</button>}
+        />
+      ) : (
+        <>
+          <div style={{ padding: '10px 12px 0' }}>
+            {cart.items.map((it) => (
+              <div key={it.key} className="card" style={{ display: 'flex', gap: 10, padding: 10, marginBottom: 10, borderRadius: 14, position: 'relative' }}>
+                {/* 勾选 */}
+                <button onClick={() => cart.toggle(it.key)} style={{ alignSelf: 'center', color: it.checked ? 'var(--brand)' : '#C9C2CC', padding: 4 }} aria-label="选择">
+                  <Icon name={it.checked ? 'check-circle' : 'check-circle'} size={22} color={it.checked ? undefined : '#D8D2CE'} style={!it.checked ? { opacity: .35 } : undefined} />
+                </button>
+                <div className="img-ph" style={{ width: 78, height: 92, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }} onClick={() => navigate(`/mall/product/${it.productId}`)}>
+                  <img src={imgSafe(it.cover)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={hideBadImg} />
                 </div>
+                <div className="flex-1" style={{ minWidth: 0 }}>
+                  <div className="ellipsis-2" style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.45 }} onClick={() => navigate(`/mall/product/${it.productId}`)}>{it.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
+                    {it.isCustom ? '私人定制' : '现货直购'}{it.size ? ` · ${it.size}` : ''}
+                  </div>
+                  <div className="row" style={{ justifyContent: 'space-between', marginTop: 8 }}>
+                    <span style={{ color: '#FF2E4D', fontWeight: 800, fontSize: 16 }}>¥{fmtMoney(it.price)}</span>
+                    <div className="row" style={{ gap: 4 }}>
+                      <button onClick={() => cart.patch(it.key, { qty: Math.max(1, it.qty - 1) })} style={{ width: 24, height: 24, borderRadius: 8, background: 'var(--bg-deep)', color: 'var(--text-2)' }}><Icon name="minus" size={13} /></button>
+                      <span style={{ width: 26, textAlign: 'center', fontSize: 13, fontWeight: 700 }}>{it.qty}</span>
+                      <button onClick={() => cart.patch(it.key, { qty: it.qty + 1 })} style={{ width: 24, height: 24, borderRadius: 8, background: 'var(--brand-soft)', color: 'var(--brand-deep)' }}><Icon name="plus" size={13} /></button>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => { cart.remove(it.key); toast('已移除'); }} style={{ position: 'absolute', right: 6, top: 6, color: 'var(--text-3)', padding: 4 }} aria-label="删除">
+                  <Icon name="trash" size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* 结算条（tab 之上） */}
+          <div style={{ position: 'fixed', bottom: 'calc(var(--tab-h) + var(--safe-bottom))', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 430, zIndex: 80, background: '#fff', borderTop: '1px solid var(--mall-line)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>已选 {cart.checkedItems.length} 件</div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>
+                合计 <span style={{ color: '#FF2E4D', fontSize: 18 }}>¥{fmtMoney(cart.total)}</span>
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* 底部结算栏 */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 430, zIndex: 90,
-        background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(12px)',
-        borderTop: '1px solid var(--line)',
-        padding: '10px 16px calc(var(--safe-bottom) + 10px)',
-        display: 'flex', alignItems: 'center', gap: 12,
-      }}>
-        <div className="row" style={{ gap: 8 }}>
-          <Check on={allChecked} onToggle={toggleAll} />
-          <span style={{ fontSize: 13 }}>全选</span>
-        </div>
-        <div className="flex-1" style={{ textAlign: 'right' }}>
-          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>合计：</span>
-          <Price value={total} size={18} />
-        </div>
-        <button className="btn btn-primary" style={{ height: 40, padding: '0 26px' }} onClick={goCheckout}>
-          去结算({selected.length})
-        </button>
-      </div>
+            <button className="btn btn-primary" style={{ height: 44, padding: '0 34px' }} onClick={goCheckout}>去结算</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

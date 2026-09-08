@@ -5,7 +5,7 @@ import Icon from '../../components/Icon';
 import { Avatar, Tag, SectionHeader, CertBadge } from '../../components/ui';
 import { Sheet, useToast } from '../../components/Sheet';
 import { useLocalState } from '../../utils/store';
-import { courses, userById, img } from '../../data/mock';
+import { courses, userById, img } from '../../data/courses';
 
 const DEFAULT_PROGRESS: Record<number, number> = { 201: 1620, 202: 576 };
 const LEVEL_TAG = {
