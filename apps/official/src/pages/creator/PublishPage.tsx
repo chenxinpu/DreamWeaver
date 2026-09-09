@@ -1,7 +1,8 @@
 /* ============================================================================
- * /creator/publish 发推文 —— 关联作品置顶 → 内容 → 配图与预览合并 → 手动话题标签；
- * 右侧「我的推文」：近一天 / 近 3 天 / 近一周 分组（tabs 同橱窗材料），展示每条的市场
- * 认可进度（P60 点赞 / 评论 10 达标），未达标推文可点「模拟热度」演示自动入池。
+ * /creator/publish 发推文 —— 同橱窗材料：顶部「文字介绍 + 发布新推文」按钮；
+ * 点击后展开发布编辑器（关联作品置顶→内容→配图与预览合并→手动话题→3D/打版微调→发布）。
+ * 右侧「我的推文」：近一天 / 近 3 天 / 近一周（tabs 同橱窗材料），每条市场认可进度，
+ * 未达标推文可点「演示：模拟互动热度」演示自动入池。
  * ==========================================================================*/
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -10,7 +11,7 @@ import { useToast } from '../../components/Sheet';
 import { api } from '../../api/client';
 import type { FeedItem, Material, Work } from '../../api/types';
 import { hideBadImg, imgSafe, fmtCount, relTime } from '../../components/shared/utils';
-import { useAsync, Field, TagInput, MaterialPickModal, Loading } from './_shared';
+import { useAsync, Field, TagInput, MaterialPickModal, Loading, CState } from './_shared';
 
 const RANGE_TABS = [
   { key: 1, label: '近一天' },
@@ -30,6 +31,7 @@ export default function PublishPage() {
   const materialList = mats?.list || [];
 
   /* 表单 */
+  const [editing, setEditing] = React.useState(false);
   const [content, setContent] = React.useState('');
   const [tags, setTags] = React.useState<string[]>([]);
   const [workId, setWorkId] = React.useState<string>('');
@@ -47,6 +49,7 @@ export default function PublishPage() {
 
   React.useEffect(() => {
     if (workIdParam && !workId) {
+      setEditing(true);
       setWorkId(workIdParam);
       const w = works.find((x) => String(x.id) === workIdParam);
       if (w) {
@@ -97,7 +100,8 @@ export default function PublishPage() {
       setContent('');
       setImages([]);
       setTags([]);
-      setTick((t) => t + 1); // 刷新我的推文
+      setTick((t) => t + 1);
+      setEditing(false);
     } catch (e) {
       toast((e as Error).message || '发布失败');
     } finally {
@@ -133,134 +137,169 @@ export default function PublishPage() {
   };
 
   return (
-    <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-      {/* ================= 左：编辑区 ================= */}
-      <div className="c-card flex-1" style={{ minWidth: 440 }}>
-        <div className="c-card-hd">
-          <span className="c-card-title">发布新推文</span>
-          <span className="c-pill">3D 图 + 打版图 展示设计过程</span>
-        </div>
-
-        {/* 1. 关联作品（置顶） */}
-        <Field label="关联作品" required hint={selWork ? `已选择「${selWork.title}」，会自动带入其打版/3D 素材` : '从「作品」中选择要发布的内容'}>
-          {worksLoading ? <Loading compact /> : (
-            <select className="c-select" value={workId} onChange={(e) => {
-              setWorkId(e.target.value);
-              const w = works.find((x) => String(x.id) === e.target.value);
-              if (w) { setPatternIds([...w.patternMatIds]); setModelIds([...w.modelMatIds]); }
-            }}>
-              <option value="">请选择要发布的作品…</option>
-              {works.map((w) => <option key={w.id} value={String(w.id)}>{w.title}（{w.category}）</option>)}
-            </select>
-          )}
-        </Field>
-
-        {/* 2. 推文内容 */}
-        <Field label="推文内容" required hint="介绍你的新作品：设计灵感、工艺亮点、上身感受…">
-          <textarea className="c-textarea" rows={5} value={content} onChange={(e) => setContent(e.target.value)}
-            placeholder={'把作品介绍给粉丝：\n例如：夏日新作打版首秀，泡泡袖连衣裙上身效果超出预期！'} />
-        </Field>
-
-        {/* 3. 话题标签（仅手动输入） */}
-        <Field label="话题标签" hint="手动输入后按回车添加（最多 8 个）">
-          <TagInput value={tags} onChange={setTags} placeholder="输入标签，如：法式 / 泡泡袖" />
-        </Field>
-
-        {/* 4. 配图：选择 + 预览合并 */}
-        <Field label={`配图（${images.length}/6）`} hint="从图片素材选择真人/上身图；留空时自动用关联作品图 + 所选素材封面">
-          {imgMats.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
-              {imgMats.map((m: Material) => {
-                const c = m.cover || '';
-                const on = !!c && images.includes(c);
-                return (
-                  <div key={m.id} className={`pick-cell ${on ? 'on' : ''}`} onClick={() => c && toggleImg(c)} style={{ cursor: 'pointer' }}>
-                    <div className="ph" style={{ aspectRatio: '1' }}><img src={imgSafe(c)} alt="" onError={hideBadImg} loading="lazy" /></div>
-                    <span className="ck">{on ? <Icon name="check" size={12} /> : <Icon name="plus" size={12} />}</span>
-                    <span className="cap">{m.title || m.fileName}</span>
-                  </div>
-                );
-              })}
+    <div>
+      {/* 顶部：文字介绍 + 发布新推文按钮（同橱窗材料 / 作品） */}
+      <div className="c-card">
+        <div className="row" style={{ gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 320, maxWidth: 720 }}>
+            <div className="c-card-title" style={{ marginBottom: 6 }}>发布推文</div>
+            <div className="c-hint">
+              把「作品」推给粉丝，让市场来投票：关联作品后自动带入其 <b>3D 结果图</b> 与 <b>打版图</b>，写清卖点、点选配图并加上话题。
+              发布即进入市场验证——<b>点赞超过当日平台 P60 或评论 ≥10</b>，作品会自动纳入资源池并提醒你准备橱窗材料
+              （真人穿搭图 / 各部件面料 / 规格尺码 / 3D 与打版文件）。可在右侧「我的推文」按 近一天/近3天/近一周 跟踪进度。
             </div>
-          )}
-          {!imgMats.length && <div style={{ color: '#9AA0AA', fontSize: 12.5, padding: '8px 0' }}>暂无图片素材（png/jpg），可去素材库导入</div>}
-
-          {/* 已选配图预览 */}
-          {images.length > 0 && (
-            <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              {images.map((s) => (
-                <span key={s} className="row" style={{ position: 'relative' }}>
-                  <img src={imgSafe(s)} alt="" onError={hideBadImg} style={{ width: 54, height: 66, objectFit: 'cover', borderRadius: 9 }} />
-                  <button onClick={() => toggleImg(s)} style={{ position: 'absolute', right: -5, top: -5, width: 18, height: 18, borderRadius: '50%', background: '#E5484D', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name="close" size={11} />
-                  </button>
-                </span>
-              ))}
-              <button className="c-btn c-btn-sm c-btn-outline" onClick={() => setImages([])}><Icon name="trash" size={12} />清空</button>
-            </div>
-          )}
-        </Field>
-
-        {/* 5. 3D / 打版素材（随作品带入，可微调） */}
-        <div className="row" style={{ gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div className="flex-1" style={{ minWidth: 220 }}>
-            <Field label={`3D 素材${modelIds.length ? ` ×${modelIds.length}` : ''}`}>
-              <button className="c-btn c-btn-outline" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setPick('model')}>
-                <span className="row" style={{ gap: 6 }}><Icon name="layers" size={14} color="#3B82F6" />调整 3D 图素材</span>
-                <Icon name="chevron-right" size={14} color="#C0C4CC" />
-              </button>
-            </Field>
           </div>
-          <div className="flex-1" style={{ minWidth: 220 }}>
-            <Field label={`打版素材${patternIds.length ? ` ×${patternIds.length}` : ''}`}>
-              <button className="c-btn c-btn-outline" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setPick('pattern')}>
-                <span className="row" style={{ gap: 6 }}><Icon name="pen-tool" size={14} color="#B4547A" />调整打版图素材</span>
-                <Icon name="chevron-right" size={14} color="#C0C4CC" />
-              </button>
-            </Field>
-          </div>
-        </div>
-
-        <div className="row" style={{ gap: 10, marginTop: 10 }}>
-          <button className="c-btn c-btn-primary c-btn-lg flex-1" disabled={publishing || !content.trim() || !workId} onClick={publish}>
-            <Icon name="send" size={15} />{publishing ? '发布中…' : '发布推文'}
-          </button>
+          {!editing && (
+            <button className="c-btn c-btn-primary" onClick={() => { setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+              <Icon name="plus" size={15} />发布新推文
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ================= 右：我的推文（市场认可进度） ================= */}
-      <div style={{ width: 380, flexShrink: 0 }}>
-        <div className="c-card">
-          <div className="c-card-hd" style={{ flexWrap: 'wrap', gap: 8 }}>
-            <span className="c-card-title">我的推文</span>
-            <div className="c-tabs">
-              {RANGE_TABS.map((r) => (
-                <button key={r.key} className={`c-tab ${days === r.key ? 'on' : ''}`} onClick={() => { if (days !== r.key) loadMine(r.key); }}>
-                  {r.label}
-                </button>
-              ))}
+      <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+        {/* ============ 左：编辑器 / 引导占位 ============ */}
+        {editing ? (
+          <div className="c-card flex-1" style={{ minWidth: 440, border: '1.5px solid #E8B9CB' }}>
+            <div className="c-card-hd">
+              <span className="c-card-title"><Icon name="send" size={15} color="var(--brand)" />发布新推文</span>
+              <button className="c-btn c-btn-outline c-btn-sm" onClick={() => setEditing(false)}><Icon name="close" size={13} />关闭</button>
+            </div>
+
+            {/* 1. 关联作品（置顶） */}
+            <Field label="关联作品" required hint={selWork ? `已选择「${selWork.title}」，会自动带入其打版/3D 素材` : '从「作品」中选择要发布的内容'}>
+              {worksLoading ? <Loading compact /> : (
+                <select className="c-select" value={workId} onChange={(e) => {
+                  setWorkId(e.target.value);
+                  const w = works.find((x) => String(x.id) === e.target.value);
+                  if (w) { setPatternIds([...w.patternMatIds]); setModelIds([...w.modelMatIds]); }
+                }}>
+                  <option value="">请选择要发布的作品…</option>
+                  {works.map((w) => <option key={w.id} value={String(w.id)}>{w.title}（{w.category}）</option>)}
+                </select>
+              )}
+            </Field>
+
+            {/* 2. 推文内容 */}
+            <Field label="推文内容" required hint="介绍你的新作品：设计灵感、工艺亮点、上身感受…">
+              <textarea className="c-textarea" rows={5} value={content} onChange={(e) => setContent(e.target.value)}
+                placeholder={'把作品介绍给粉丝：\n例如：夏日新作打版首秀，泡泡袖连衣裙上身效果超出预期！'} />
+            </Field>
+
+            {/* 3. 话题标签（仅手动输入） */}
+            <Field label="话题标签" hint="手动输入后按回车添加（最多 8 个）">
+              <TagInput value={tags} onChange={setTags} placeholder="输入标签，如：法式 / 泡泡袖" />
+            </Field>
+
+            {/* 4. 配图：选择 + 预览合并 */}
+            <Field label={`配图（${images.length}/6）`} hint="从图片素材选择真人/上身图；留空时自动用关联作品图 + 所选素材封面">
+              {imgMats.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
+                  {imgMats.map((m: Material) => {
+                    const c = m.cover || '';
+                    const on = !!c && images.includes(c);
+                    return (
+                      <div key={m.id} className={`pick-cell ${on ? 'on' : ''}`} onClick={() => c && toggleImg(c)} style={{ cursor: 'pointer' }}>
+                        <div className="ph" style={{ aspectRatio: '1' }}><img src={imgSafe(c)} alt="" onError={hideBadImg} loading="lazy" /></div>
+                        <span className="ck">{on ? <Icon name="check" size={12} /> : <Icon name="plus" size={12} />}</span>
+                        <span className="cap">{m.title || m.fileName}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {!imgMats.length && <div style={{ color: '#9AA0AA', fontSize: 12.5, padding: '8px 0' }}>暂无图片素材（png/jpg），可去素材库导入</div>}
+
+              {/* 已选配图预览 */}
+              {images.length > 0 && (
+                <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                  {images.map((s) => (
+                    <span key={s} className="row" style={{ position: 'relative' }}>
+                      <img src={imgSafe(s)} alt="" onError={hideBadImg} style={{ width: 54, height: 66, objectFit: 'cover', borderRadius: 9 }} />
+                      <button onClick={() => toggleImg(s)} style={{ position: 'absolute', right: -5, top: -5, width: 18, height: 18, borderRadius: '50%', background: '#E5484D', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="close" size={11} />
+                      </button>
+                    </span>
+                  ))}
+                  <button className="c-btn c-btn-sm c-btn-outline" onClick={() => setImages([])}><Icon name="trash" size={12} />清空</button>
+                </div>
+              )}
+            </Field>
+
+            {/* 5. 3D / 打版素材（随作品带入，可微调） */}
+            <div className="row" style={{ gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div className="flex-1" style={{ minWidth: 220 }}>
+                <Field label={`3D 素材${modelIds.length ? ` ×${modelIds.length}` : ''}`}>
+                  <button className="c-btn c-btn-outline" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setPick('model')}>
+                    <span className="row" style={{ gap: 6 }}><Icon name="layers" size={14} color="#3B82F6" />调整 3D 图素材</span>
+                    <Icon name="chevron-right" size={14} color="#C0C4CC" />
+                  </button>
+                </Field>
+              </div>
+              <div className="flex-1" style={{ minWidth: 220 }}>
+                <Field label={`打版素材${patternIds.length ? ` ×${patternIds.length}` : ''}`}>
+                  <button className="c-btn c-btn-outline" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setPick('pattern')}>
+                    <span className="row" style={{ gap: 6 }}><Icon name="pen-tool" size={14} color="#B4547A" />调整打版图素材</span>
+                    <Icon name="chevron-right" size={14} color="#C0C4CC" />
+                  </button>
+                </Field>
+              </div>
+            </div>
+
+            <div className="row" style={{ gap: 10, marginTop: 12 }}>
+              <button className="c-btn c-btn-outline c-btn-lg" onClick={() => setEditing(false)} disabled={publishing}>
+                <Icon name="close" size={15} />取消
+              </button>
+              <button className="c-btn c-btn-primary c-btn-lg flex-1" disabled={publishing || !content.trim() || !workId} onClick={publish}>
+                <Icon name="send" size={15} />{publishing ? '发布中…' : '发布推文'}
+              </button>
             </div>
           </div>
+        ) : (
+          <div className="c-card flex-1" style={{ minWidth: 440, minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CState
+              icon="send"
+              title="还没有进行中的发布"
+              desc="先到「作品」页创建作品，回到本页点右上角「发布新推文」：选作品 → 写内容 → 配图加话题 → 发布验证市场。"
+              action={<button className="c-btn c-btn-primary" onClick={() => { setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><Icon name="plus" size={14} />发布新推文</button>}
+            />
+          </div>
+        )}
 
-          {myLoading ? <Loading text="加载我的推文…" /> : null}
-          {!myLoading && myList.length === 0 && (
-            <div className="c-state" style={{ padding: '26px 10px' }}>
-              <div className="ico" style={{ background: '#F7F8FA', color: '#B7BCC6' }}><Icon name="send" size={22} /></div>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>该时间段暂无推文</div>
-              <div className="c-hint" style={{ fontSize: 11.5, marginTop: 6 }}>发布后展示 点赞 vs 当日 P60 / 评论 10 条的进度，达标自动入资源池</div>
+        {/* ============ 右：我的推文（市场认可进度） ============ */}
+        <div style={{ width: 380, flexShrink: 0 }}>
+          <div className="c-card">
+            <div className="c-card-hd" style={{ flexWrap: 'wrap', gap: 8 }}>
+              <span className="c-card-title">我的推文</span>
+              <div className="c-tabs">
+                {RANGE_TABS.map((r) => (
+                  <button key={r.key} className={`c-tab ${days === r.key ? 'on' : ''}`} onClick={() => { if (days !== r.key) loadMine(r.key); }}>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
 
-          {!myLoading && myList.map((p) => <MyPostRow key={p.id} post={p} simulating={publishing} onSimulate={() => simulate(p)} onOpen={() => navigate(`/post/${p.id}`)} />)}
-        </div>
+            {myLoading ? <Loading text="加载我的推文…" /> : null}
+            {!myLoading && myList.length === 0 && (
+              <div className="c-state" style={{ padding: '26px 10px' }}>
+                <div className="ico" style={{ background: '#F7F8FA', color: '#B7BCC6' }}><Icon name="send" size={22} /></div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>该时间段暂无推文</div>
+                <div className="c-hint" style={{ fontSize: 11.5, marginTop: 6 }}>发布后展示 点赞 vs 当日 P60 / 评论 10 条的进度，达标自动入资源池</div>
+              </div>
+            )}
 
-        <div className="c-card" style={{ marginTop: 12 }}>
-          <div className="c-card-title" style={{ marginBottom: 10 }}>发布小贴士</div>
-          <ul style={{ fontSize: 11.5, color: '#6B7180', lineHeight: 2.1, paddingLeft: 16 }}>
-            <li>推文必须关联一件「作品」，作品请先在「作品」页创建</li>
-            <li>点赞超过当日平台 P60，或评论 ≥10，系统自动纳入资源池并通知你</li>
-            <li>入池后 → 资源池 → 「去上橱窗」准备真人穿搭图与规格</li>
-          </ul>
+            {!myLoading && myList.map((p) => <MyPostRow key={p.id} post={p} simulating={publishing} onSimulate={() => simulate(p)} onOpen={() => navigate(`/post/${p.id}`)} />)}
+          </div>
+
+          <div className="c-card" style={{ marginTop: 12 }}>
+            <div className="c-card-title" style={{ marginBottom: 10 }}>发布小贴士</div>
+            <ul style={{ fontSize: 11.5, color: '#6B7180', lineHeight: 2.1, paddingLeft: 16 }}>
+              <li>推文必须关联一件「作品」，作品请先在「作品」页创建</li>
+              <li>点赞超过当日平台 P60，或评论 ≥10，系统自动纳入资源池并通知你</li>
+              <li>入池后 → 资源池 → 「去上橱窗」准备真人穿搭图与规格</li>
+            </ul>
+          </div>
         </div>
       </div>
 

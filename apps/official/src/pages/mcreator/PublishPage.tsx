@@ -13,7 +13,7 @@ import type { FeedItem, Material, Work } from '../../api/types';
 import { hideBadImg, imgSafe, fmtCount, relTime } from '../../components/shared/utils';
 import { MaterialBadge } from '../../components/shared/MaterialBadge';
 import { useAsync, Field, TagInput, MaterialPickModal, Loading } from './bits';
-import { MEmpty, MCardHd } from './bits';
+import { MEmpty } from './bits';
 
 const RANGES = [
   { key: 1, label: '近一天' },
@@ -40,6 +40,7 @@ export default function MPublishPage() {
   const [images, setImages] = React.useState<string[]>([]);
   const [pick, setPick] = React.useState<'pattern' | 'model' | null>(null);
   const [publishing, setPublishing] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
 
   const [days, setDays] = React.useState(1);
   const [myList, setMyList] = React.useState<FeedItem[]>([]);
@@ -49,6 +50,7 @@ export default function MPublishPage() {
 
   React.useEffect(() => {
     if (workIdParam && !workId) {
+      setEditing(true);
       setWorkId(workIdParam);
       const w = works.find((x) => String(x.id) === workIdParam);
       if (w) {
@@ -100,6 +102,7 @@ export default function MPublishPage() {
       setImages([]);
       setTags([]);
       setTick((t) => t + 1);
+      setEditing(false);
     } catch (e) {
       toast((e as Error).message || '发布失败');
     } finally {
@@ -139,9 +142,33 @@ export default function MPublishPage() {
 
   return (
     <div>
-      {/* ===== 发布编辑区 ===== */}
+      {/* ===== 顶部：推文文字介绍 + 发布新推文按钮（同橱窗材料） ===== */}
       <div className="mc-card">
-        <MCardHd icon="send" title="发布新推文" right={<span className="c-pill">3D 图 + 打版图</span>} />
+        <div className="row" style={{ gap: 12, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div className="row" style={{ gap: 6, fontSize: 17, fontWeight: 800 }}>
+              <Icon name="send" size={18} color="var(--brand)" />发布推文
+            </div>
+            <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.9, color: '#6B7180' }}>
+              把「作品」推给粉丝：先关联一件作品（自动带入其 3D 与打版素材），写清卖点、点选配图并加上话题。发布即进入<b>市场验证</b>——点赞超过当日 P60 或评论 ≥10，系统会把作品自动纳入资源池，并提醒你准备橱窗材料（真人穿搭图 / 规格表 / 3D 与打版文件）。
+            </div>
+          </div>
+          {!editing && (
+            <button className="c-btn c-btn-primary" onClick={() => { setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+              <Icon name="plus" size={15} />发布新推文
+            </button>
+          )}
+        </div>
+      </div>
+
+      {editing && (
+      <>
+      {/* ===== 发布编辑区 ===== */}
+      <div className="mc-card" style={{ marginTop: 10, border: '1px solid #E8B9CB' }}>
+        <div className="mc-hd" style={{ marginBottom: 10 }}>
+          <div className="mc-hd-title"><Icon name="send" size={15} color="var(--brand)" />发布新推文</div>
+          <button className="c-btn c-btn-sm c-btn-outline" onClick={() => setEditing(false)}><Icon name="close" size={13} />关闭</button>
+        </div>
 
         <div className="mc-form">
           <Field label="关联作品" required hint={selWork ? `已选择「${selWork.title}」，自动带入其打版 / 3D 素材` : '从「作品」中选择要发布的内容'}>
@@ -225,6 +252,8 @@ export default function MPublishPage() {
           <Icon name="send" size={16} />{publishing ? '发布中…' : '发布推文'}
         </button>
       </div>
+      </>
+      )}
 
       {/* ===== 我的推文 ===== */}
       <div className="mc-card" style={{ marginTop: 10 }}>
