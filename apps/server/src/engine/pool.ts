@@ -17,7 +17,8 @@ function p60Of(likes: number[]): number {
     const idx = Math.ceil(n * 0.6) - 1; // ceil(n*0.6) 个值(1基) → 数组下标 -1
     return sorted[Math.max(0, Math.min(n - 1, idx))];
   }
-  return sorted.reduce((a, b) => a + b, 0) / n; // n<3 用均值
+  // 冷启动（当日 <3 篇推文）：P60 置 0，点赞 >0 即视为超出当日热度分位
+  return 0;
 }
 
 /** 评估某个日期（默认今天）的全平台推文，返回新增入池明细 */
@@ -87,7 +88,7 @@ export function poolMeta(): { engine: string; lastEval: string | null; rule: str
     lastEval: db.settings.lastPoolEval || null,
     rule: [
       '每日 00:05 自动评估一次；点赞/评论/发帖后对该作者推文增量评估',
-      '点赞集合 P60 = 当日推文点赞数升序第 ceil(n*0.6) 个；n<3 时取均值',
+      '点赞集合 P60 = 当日推文点赞数升序第 ceil(n*0.6) 个；当日不足 3 篇为冷启动，P60=0（点赞>0 即入池）',
       '合格即创建资源池条目并向创作者发送提醒（准备橱窗材料）',
     ],
   };

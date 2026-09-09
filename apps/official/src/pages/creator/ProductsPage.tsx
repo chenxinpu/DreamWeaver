@@ -82,12 +82,16 @@ export default function ProductsPage() {
           {tabCards.map((t) => (
             <button key={t.key} className={`c-tab ${tab === t.key ? 'on' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
-          <button className="c-btn c-btn-outline c-btn-sm" style={{ marginLeft: 8 }} onClick={reload}><Icon name="refresh" size={13} />刷新</button>
         </div>
       </div>
 
       {loading && <div className="c-card" style={{ marginTop: 12 }}><Loading /></div>}
-      {!loading && error && <div className="c-card" style={{ marginTop: 12 }}><CState danger icon="bag" title="商品加载失败" desc={error} /></div>}
+      {!loading && error && (
+        <div className="c-card" style={{ marginTop: 12 }}>
+          <CState danger icon="bag" title="商品加载失败" desc={error}
+            action={<button className="c-btn c-btn-outline" onClick={reload}><Icon name="refresh" size={13} />重试</button>} />
+        </div>
+      )}
       {!loading && !error && visible.length === 0 && (
         <div className="c-card" style={{ marginTop: 12 }}>
           <CState icon="bag" title={tab === 'all' ? '还没有商品' : '该状态下暂无商品'}

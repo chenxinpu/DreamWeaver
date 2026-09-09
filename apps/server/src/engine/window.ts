@@ -22,8 +22,7 @@ const REQUIRED_CHECKS: { key: string; label: string; ok: (w: WindowMaterial) => 
   { key: 'sizeChart', label: '规格尺码表 ≥ 2 档（spec.sizeChart）', ok: (w) => (w.spec?.sizeChart || []).length >= 2 },
   { key: 'patternMatIds', label: '打版结果文件（patternMatIds ≥ 1）', ok: (w) => (w.patternMatIds || []).length >= 1 },
   { key: 'modelMatIds', label: '3D 结果文件（modelMatIds ≥ 1）', ok: (w) => (w.modelMatIds || []).length >= 1 },
-  { key: 'price', label: '原价 price > 0', ok: (w) => w.price > 0 },
-  { key: 'baseFee', label: '基础费用 baseFee > 0', ok: (w) => w.baseFee > 0 },
+  // 原价/基础费用不再由创作者填写：提交时若缺失由平台按品类默认定价补齐，故不参与完整性校验
 ];
 
 /** 完整性检查 */

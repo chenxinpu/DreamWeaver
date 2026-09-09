@@ -31,8 +31,6 @@ interface WForm {
   specLabel: string;
   specNote: string;
   rows: Row[];
-  price: string;
-  baseFee: string;
   patternMatIds: number[];
   modelMatIds: number[];
 }
@@ -61,6 +59,7 @@ export default function WindowPage() {
   const [saving, setSaving] = React.useState<'draft' | 'submit' | null>(null);
   const [result, setResult] = React.useState<WindowMaterial | null>(null);
   const [approveEditWarn, setApproveEditWarn] = React.useState<WindowMaterial | null>(null);
+  const [delTarget, setDelTarget] = React.useState<WindowMaterial | null>(null);
 
   const deepLinked = React.useRef(false);
 
@@ -103,8 +102,6 @@ export default function WindowPage() {
       specLabel: '标准版型',
       specNote: '',
       rows: [],
-      price: '',
-      baseFee: '',
       patternMatIds: [...(work.patternMatIds || [])],
       modelMatIds: [...(work.modelMatIds || [])],
     };
@@ -121,8 +118,6 @@ export default function WindowPage() {
       specLabel: w.spec?.label || '标准版型',
       specNote: w.spec?.note || '',
       rows: (w.spec?.sizeChart || []).map((r) => rowToStr(r)),
-      price: String(w.price ?? ''),
-      baseFee: String(w.baseFee ?? ''),
       patternMatIds: [...(w.patternMatIds || [])],
       modelMatIds: [...(w.modelMatIds || [])],
     });
@@ -135,7 +130,7 @@ export default function WindowPage() {
 
   const closeEdit = () => { if (!saving) { setEditor(null); setResult(null); } };
 
-  /** 完整性自检（与后端一致） */
+  /** 完整性自检（与后端一致；原价/基础费用由平台定价，不再要求表单填写） */
   const completeness = (f: WForm): string[] => {
     const missing: string[] = [];
     if (!(f.photos || []).length) missing.push('真人穿搭实景图 ≥1');
@@ -143,8 +138,6 @@ export default function WindowPage() {
     if ((f.rows || []).length < 2) missing.push('规格尺码表 ≥ 2 档');
     if (!(f.patternMatIds || []).length) missing.push('打版文件 ≥1');
     if (!(f.modelMatIds || []).length) missing.push('3D 文件 ≥1');
-    if (!(Number(f.price) > 0)) missing.push('原价 price > 0');
-    if (!(Number(f.baseFee) > 0)) missing.push('基础费用 > 0');
     return missing;
   };
 
@@ -163,8 +156,6 @@ export default function WindowPage() {
         sizeChart: editor.rows.map((r) => rowToNum(r)).filter((r) => r.size),
         ...(editor.specNote ? { note: editor.specNote } : {}),
       },
-      price: Number(editor.price) || 0,
-      baseFee: Number(editor.baseFee) || 0,
       patternMatIds: editor.patternMatIds,
       modelMatIds: editor.modelMatIds,
       action,
@@ -361,18 +352,10 @@ export default function WindowPage() {
             </div>
           </div>
 
-          {/* 价格 */}
-          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr 2fr' }}>
-            <Field label="原价 price" required>
-              <div className="row" style={{ gap: 6 }}><span style={{ color: '#8B919C' }}>¥</span><input className="c-input" type="number" min={0} value={edited.price} onChange={(e) => setEditor({ ...edited, price: e.target.value })} placeholder="如 328" /></div>
-            </Field>
-            <Field label="基础费用 baseFee" required hint="定制加工/材料/人工">
-              <div className="row" style={{ gap: 6 }}><span style={{ color: '#8B919C' }}>¥</span><input className="c-input" type="number" min={0} value={edited.baseFee} onChange={(e) => setEditor({ ...edited, baseFee: e.target.value })} placeholder="如 68" /></div>
-            </Field>
-            <Field label="风格标签">
-              <TagInput value={edited.styleTags} onChange={(styleTags) => setEditor({ ...edited, styleTags })} suggest={['法式', '碎花', '通勤', '复古', '缎面', '极简']} />
-            </Field>
-          </div>
+          {/* 风格标签（原价/基础费用由平台按品类默认定价，表单不再采集） */}
+          <Field label="风格标签" hint="定价由平台按品类参考价生成，可在「商品管理」中查看">
+            <TagInput value={edited.styleTags} onChange={(styleTags) => setEditor({ ...edited, styleTags })} suggest={['法式', '碎花', '通勤', '复古', '缎面', '极简']} />
+          </Field>
 
           {/* 3D/打版素材 */}
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
@@ -495,7 +478,7 @@ export default function WindowPage() {
                   <span className="c-badge c-badge-gray">{w.category}</span>
                 </div>
                 <div className="c-hint" style={{ fontSize: 11.5, marginTop: 4, lineHeight: 1.8 }}>
-                  价格 ¥{Number(w.price).toLocaleString()} · 基础费 ¥{Number(w.baseFee).toLocaleString()} · 图 {w.photos?.length || 0} · 面料 {w.partsFabric?.length || 0} · 尺码 {w.spec?.sizeChart?.length || 0} 档
+                  {Number(w.price) > 0 ? `平台参考价 ¥${Number(w.price).toLocaleString()} · 基础费 ¥${Number(w.baseFee).toLocaleString()} · ` : ''}图 {w.photos?.length || 0} · 面料 {w.partsFabric?.length || 0} · 尺码 {w.spec?.sizeChart?.length || 0} 档
                   {w.work?.id ? ` · 作品「${(w.work as { title?: string }).title || ''}」` : ''}
                 </div>
                 {(w.styleTags || []).length > 0 && (
@@ -530,6 +513,9 @@ export default function WindowPage() {
                 {(w.status === 'draft' || w.status === 'rejected') && (
                   <button className="c-btn c-btn-outline c-btn-sm" onClick={() => openEdit(w)}><Icon name="edit" size={12} />{w.status === 'rejected' ? '补齐重提' : '继续编辑'}</button>
                 )}
+                {(w.status === 'draft' || w.status === 'rejected') && (
+                  <button className="c-btn c-btn-danger c-btn-sm" onClick={() => setDelTarget(w)}><Icon name="trash" size={12} />删除</button>
+                )}
                 {w.status === 'approved' && (
                   <button className="c-btn c-btn-outline c-btn-sm" onClick={() => setApproveEditWarn(w)}><Icon name="edit" size={12} />修改材料（将重新审核）</button>
                 )}
@@ -550,6 +536,25 @@ export default function WindowPage() {
       <Confirm open={!!approveEditWarn} title="修改已通过的材料？" danger
         body={approveEditWarn ? <>「{approveEditWarn.productName}」已审核上架。修改<b>任何材料字段</b>都会：① 状态转回草稿 ② <b>原商品自动下架</b> ③ 需重新提交审核通过后再上架。仅修改非材料文案请走「商品管理 → 编辑详情」。</> : null}
         okText="继续修改材料" onOk={() => { if (approveEditWarn) openEdit(approveEditWarn); setApproveEditWarn(null); }} onClose={() => setApproveEditWarn(null)} />
+
+      {/* 删除草稿/被拒材料确认 */}
+      <Confirm open={!!delTarget} title="删除这组橱窗材料？" danger
+        body={delTarget ? <>「{delTarget.productName}」（状态：{delTarget.status === 'rejected' ? '被拒' : '草稿'}）删除后不可恢复。审核通过的材料需先到商品管理处理后再删除。</> : null}
+        okText="确认删除"
+        onOk={async () => {
+          if (!delTarget) return;
+          try {
+            await api.window.remove(delTarget.id);
+            toast('橱窗材料已删除', 'check');
+            if (editor?.id === delTarget.id) closeEdit();
+            reload();
+          } catch (e) {
+            toast((e as Error).message || '删除失败');
+          } finally {
+            setDelTarget(null);
+          }
+        }}
+        onClose={() => setDelTarget(null)} />
     </div>
   );
 

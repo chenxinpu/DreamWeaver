@@ -1,6 +1,7 @@
 /* ============================================================================
- * /creator/publish 发推文 —— 内容 + 关联作品 + 素材 + 配图 → 发布；
- * 右侧实时「市场认可进度卡」（P60 / 评论10 达标即入池，发布后自动拉取）
+ * /creator/publish 发推文 —— 关联作品置顶 → 内容 → 配图与预览合并 → 手动话题标签；
+ * 右侧「我的推文」：近一天 / 近 3 天 / 近一周 分组（tabs 同橱窗材料），展示每条的市场
+ * 认可进度（P60 点赞 / 评论 10 达标），未达标推文可点「模拟热度」演示自动入池。
  * ==========================================================================*/
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -8,10 +9,14 @@ import Icon from '../../components/Icon';
 import { useToast } from '../../components/Sheet';
 import { api } from '../../api/client';
 import type { FeedItem, Material, Work } from '../../api/types';
-import { hideBadImg, imgSafe } from '../../components/shared/utils';
-import { useAsync, Field, TagInput, Modal, MaterialPickModal, Loading } from './_shared';
+import { hideBadImg, imgSafe, fmtCount, relTime } from '../../components/shared/utils';
+import { useAsync, Field, TagInput, MaterialPickModal, Loading } from './_shared';
 
-const QUICK_TAGS = ['法式', '碎花', '通勤', '泡泡袖', '缎面', '新中式', '复古', '极简', '设计手记', '打版'];
+const RANGE_TABS = [
+  { key: 1, label: '近一天' },
+  { key: 3, label: '近 3 天' },
+  { key: 7, label: '近一周' },
+];
 
 export default function PublishPage() {
   const navigate = useNavigate();
@@ -24,18 +29,22 @@ export default function PublishPage() {
   const works = worksData?.list || [];
   const materialList = mats?.list || [];
 
+  /* 表单 */
   const [content, setContent] = React.useState('');
   const [tags, setTags] = React.useState<string[]>([]);
   const [workId, setWorkId] = React.useState<string>('');
   const [patternIds, setPatternIds] = React.useState<number[]>([]);
   const [modelIds, setModelIds] = React.useState<number[]>([]);
   const [images, setImages] = React.useState<string[]>([]);
-  const [pick, setPick] = React.useState<'pattern' | 'model' | 'image' | null>(null);
+  const [pick, setPick] = React.useState<'pattern' | 'model' | null>(null);
   const [publishing, setPublishing] = React.useState(false);
-  const [published, setPublished] = React.useState<FeedItem | null>(null);
-  const [refreshTick, setRefreshTick] = React.useState(0);
 
-  // 深层链接 ?workId= → 自动选中作品
+  /* 我的推文（市场认可进度） */
+  const [days, setDays] = React.useState<number>(1);
+  const [myList, setMyList] = React.useState<FeedItem[]>([]);
+  const [myLoading, setMyLoading] = React.useState(false);
+  const [tick, setTick] = React.useState(0);
+
   React.useEffect(() => {
     if (workIdParam && !workId) {
       setWorkId(workIdParam);
@@ -47,27 +56,48 @@ export default function PublishPage() {
     }
   }, [workIdParam, workId, works]);
 
+  const loadMine = React.useCallback(async (d: number) => {
+    setMyLoading(true);
+    try {
+      const res = await api.posts.mine({ days: d, page: 1 });
+      setMyList(res?.list || []);
+      setDays(d);
+    } catch (e) {
+      toast((e as Error).message || '我的推文加载失败');
+    } finally {
+      setMyLoading(false);
+    }
+  }, [toast]);
+
+  React.useEffect(() => { loadMine(days); }, [days, tick, loadMine]);
+
   const selWork: Work | undefined = works.find((w) => String(w.id) === workId);
   const patternMats = materialList.filter((m) => ['dxf', 'svg'].includes(m.kind));
   const modelMats = materialList.filter((m) => ['obj', 'glb'].includes(m.kind));
   const imgMats = materialList.filter((m) => ['png', 'jpg'].includes(m.kind));
 
+  const toggleImg = (src: string) =>
+    setImages((prev) => (prev.includes(src) ? prev.filter((x) => x !== src) : prev.length < 6 ? [...prev, src] : prev));
+
   const publish = async () => {
     if (!content.trim()) { toast('请填写推文内容'); return; }
+    if (!workId) { toast('请先在上方选择要发布的关联作品'); return; }
     setPublishing(true);
     try {
       const post = await api.posts.create({
-        ...(workId ? { workId: Number(workId) } : {}),
+        workId: Number(workId),
         content: content.trim(),
         ...(images.length ? { images } : {}),
         tags,
         patternMatIds: patternIds,
         modelMatIds: modelIds,
       });
-      setPublished(post as unknown as FeedItem);
-      toast('推文已发布 🎉', 'check');
-      // 发布后立即拉取一次市场进度（增量评估结果）
-      api.posts.get(post.id).then((d) => setPublished(d)).catch(() => {});
+      void post;
+      toast('推文已发布 🎉（引擎已做增量评估，可在右侧「我的推文」查看进度）', 'check');
+      setContent('');
+      setImages([]);
+      setTags([]);
+      setTick((t) => t + 1); // 刷新我的推文
     } catch (e) {
       toast((e as Error).message || '发布失败');
     } finally {
@@ -75,41 +105,26 @@ export default function PublishPage() {
     }
   };
 
-  const refreshMarket = async () => {
-    if (!published) return;
-    setRefreshTick((t) => t + 1);
-    try {
-      const d = await api.posts.get(published.id);
-      setPublished(d);
-      toast('进度已刷新（引擎实时增量评估）', 'check');
-    } catch (e) {
-      toast((e as Error).message || '刷新失败');
-    }
-  };
-
-  /** 演示加速器：把热度提到 P60 之上 → 引擎自动评估 → 自动入资源池 + 通知（仅演示，语义同真实互动） */
-  const simulateHeat = async () => {
-    if (!published) return;
+  /** 演示加速器：提到 P60 之上 → 引擎自动评估 → 自动入池（仅演示） */
+  const simulate = async (post: FeedItem) => {
     setPublishing(true);
     try {
-      // 多次尝试：每次用最新 P60 打超过 15 个赞的裕量，直到引擎判定达标
-      let cur = published;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        if (!cur.market) {
-          cur = await api.posts.get(published.id);
-          setPublished(cur);
-        }
-        const m = cur.market || { p60: 0, likes: 0, comments: 0 };
+      let cur = post;
+      if (!cur.market) cur = await api.posts.get(post.id);
+      const m = cur.market || { p60: 0, likes: 0, comments: 0 };
+      for (let i = 0; i < 5; i++) {
         const target = Math.max((m.p60 || 0) + 15, (m.likes || 0) + 10);
         const res = await api.dev.surgeLikes(cur.id, target);
         cur = await api.posts.get(cur.id);
-        setPublished(cur);
         if (res.qualified || cur.market?.qualified) {
-          toast(`🎉 已达标自动纳入资源池：赞 ${cur.market?.likes ?? res.likesNow} > P60 ${cur.market?.p60 ?? res.p60}`, 'check');
+          toast('🎉 已达标自动纳入资源池', 'check');
+          setTick((t) => t + 1);
           return;
         }
+        m.p60 = cur.market?.p60 ?? m.p60;
+        m.likes = cur.market?.likes ?? m.likes;
       }
-      toast('热度已提升，但当日 P60 变化较快，请再试一次', undefined);
+      toast('热度已提升，但当日 P60 变化较快，请再试一次');
     } catch (e) {
       toast((e as Error).message || '模拟失败');
     } finally {
@@ -117,50 +132,81 @@ export default function PublishPage() {
     }
   };
 
-  const previewImages = images.length ? images : selWork ? selWork.mediaImages : [];
-
   return (
     <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
       {/* ================= 左：编辑区 ================= */}
-      <div className="c-card flex-1" style={{ minWidth: 430 }}>
+      <div className="c-card flex-1" style={{ minWidth: 440 }}>
         <div className="c-card-hd">
           <span className="c-card-title">发布新推文</span>
           <span className="c-pill">3D 图 + 打版图 展示设计过程</span>
         </div>
-        <Field label="推文内容" required hint="可以带 #话题#，用于验证市场偏好">
-          <textarea className="c-textarea" rows={5} value={content} onChange={(e) => setContent(e.target.value)} placeholder="介绍你的新作品：设计灵感、工艺亮点、上身感受…\n\n例如：#法式 #碎花 夏日新作打版首秀，泡泡袖连衣裙上身效果超出预期！" />
-        </Field>
-        <Field label="话题标签">
-          <TagInput value={tags} onChange={setTags} suggest={QUICK_TAGS} />
+
+        {/* 1. 关联作品（置顶） */}
+        <Field label="关联作品" required hint={selWork ? `已选择「${selWork.title}」，会自动带入其打版/3D 素材` : '从「作品」中选择要发布的内容'}>
+          {worksLoading ? <Loading compact /> : (
+            <select className="c-select" value={workId} onChange={(e) => {
+              setWorkId(e.target.value);
+              const w = works.find((x) => String(x.id) === e.target.value);
+              if (w) { setPatternIds([...w.patternMatIds]); setModelIds([...w.modelMatIds]); }
+            }}>
+              <option value="">请选择要发布的作品…</option>
+              {works.map((w) => <option key={w.id} value={String(w.id)}>{w.title}（{w.category}）</option>)}
+            </select>
+          )}
         </Field>
 
-        <div className="form-grid">
-          <Field label="关联作品" hint={selWork ? `${selWork.title}（自动带入其打版/3D 素材）` : '不关联也可仅用素材发布'}>
-            {worksLoading ? <Loading compact /> : (
-              <select className="c-select" value={workId} onChange={(e) => {
-                setWorkId(e.target.value);
-                const w = works.find((x) => String(x.id) === e.target.value);
-                if (w) { setPatternIds([...w.patternMatIds]); setModelIds([...w.modelMatIds]); }
-              }}>
-                <option value="">不关联作品</option>
-                {works.map((w) => <option key={w.id} value={String(w.id)}>{w.title}</option>)}
-              </select>
-            )}
-          </Field>
-          <Field label="图片配图" hint="留空将自动使用作品图 + 素材封面">
-            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-              <button className="c-btn c-btn-sm c-btn-outline" onClick={() => setPick('image')}><Icon name="image" size={12} />{images.length ? `已选 ${images.length} 张` : '选配图'}</button>
-              {images.length > 0 && <button className="c-btn c-btn-sm c-btn-danger" onClick={() => setImages([])}><Icon name="close" size={12} />清空</button>}
+        {/* 2. 推文内容 */}
+        <Field label="推文内容" required hint="介绍你的新作品：设计灵感、工艺亮点、上身感受…">
+          <textarea className="c-textarea" rows={5} value={content} onChange={(e) => setContent(e.target.value)}
+            placeholder={'把作品介绍给粉丝：\n例如：夏日新作打版首秀，泡泡袖连衣裙上身效果超出预期！'} />
+        </Field>
+
+        {/* 3. 话题标签（仅手动输入） */}
+        <Field label="话题标签" hint="手动输入后按回车添加（最多 8 个）">
+          <TagInput value={tags} onChange={setTags} placeholder="输入标签，如：法式 / 泡泡袖" />
+        </Field>
+
+        {/* 4. 配图：选择 + 预览合并 */}
+        <Field label={`配图（${images.length}/6）`} hint="从图片素材选择真人/上身图；留空时自动用关联作品图 + 所选素材封面">
+          {imgMats.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
+              {imgMats.map((m: Material) => {
+                const c = m.cover || '';
+                const on = !!c && images.includes(c);
+                return (
+                  <div key={m.id} className={`pick-cell ${on ? 'on' : ''}`} onClick={() => c && toggleImg(c)} style={{ cursor: 'pointer' }}>
+                    <div className="ph" style={{ aspectRatio: '1' }}><img src={imgSafe(c)} alt="" onError={hideBadImg} loading="lazy" /></div>
+                    <span className="ck">{on ? <Icon name="check" size={12} /> : <Icon name="plus" size={12} />}</span>
+                    <span className="cap">{m.title || m.fileName}</span>
+                  </div>
+                );
+              })}
             </div>
-          </Field>
-        </div>
+          )}
+          {!imgMats.length && <div style={{ color: '#9AA0AA', fontSize: 12.5, padding: '8px 0' }}>暂无图片素材（png/jpg），可去素材库导入</div>}
 
-        {/* 素材引用（自动覆盖预览） */}
+          {/* 已选配图预览 */}
+          {images.length > 0 && (
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              {images.map((s) => (
+                <span key={s} className="row" style={{ position: 'relative' }}>
+                  <img src={imgSafe(s)} alt="" onError={hideBadImg} style={{ width: 54, height: 66, objectFit: 'cover', borderRadius: 9 }} />
+                  <button onClick={() => toggleImg(s)} style={{ position: 'absolute', right: -5, top: -5, width: 18, height: 18, borderRadius: '50%', background: '#E5484D', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="close" size={11} />
+                  </button>
+                </span>
+              ))}
+              <button className="c-btn c-btn-sm c-btn-outline" onClick={() => setImages([])}><Icon name="trash" size={12} />清空</button>
+            </div>
+          )}
+        </Field>
+
+        {/* 5. 3D / 打版素材（随作品带入，可微调） */}
         <div className="row" style={{ gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div className="flex-1" style={{ minWidth: 220 }}>
             <Field label={`3D 素材${modelIds.length ? ` ×${modelIds.length}` : ''}`}>
               <button className="c-btn c-btn-outline" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setPick('model')}>
-                <span className="row" style={{ gap: 6 }}><Icon name="layers" size={14} color="#3B82F6" />选择 3D 图素材</span>
+                <span className="row" style={{ gap: 6 }}><Icon name="layers" size={14} color="#3B82F6" />调整 3D 图素材</span>
                 <Icon name="chevron-right" size={14} color="#C0C4CC" />
               </button>
             </Field>
@@ -168,172 +214,108 @@ export default function PublishPage() {
           <div className="flex-1" style={{ minWidth: 220 }}>
             <Field label={`打版素材${patternIds.length ? ` ×${patternIds.length}` : ''}`}>
               <button className="c-btn c-btn-outline" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setPick('pattern')}>
-                <span className="row" style={{ gap: 6 }}><Icon name="pen-tool" size={14} color="#B4547A" />选择打版图素材</span>
+                <span className="row" style={{ gap: 6 }}><Icon name="pen-tool" size={14} color="#B4547A" />调整打版图素材</span>
                 <Icon name="chevron-right" size={14} color="#C0C4CC" />
               </button>
             </Field>
           </div>
         </div>
 
-        {/* 配图预览（最终 images 会被后端自动补素材封面） */}
-        {previewImages.length > 0 && (
-          <Field label="配图预览">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 7 }}>
-              {previewImages.slice(0, 9).map((s) => (
-                <div key={s} style={{ borderRadius: 10, overflow: 'hidden', aspectRatio: '1', background: '#F1F2F5' }}>
-                  <img src={imgSafe(s)} alt="" onError={hideBadImg} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              ))}
-            </div>
-            {!images.length && <div style={{ fontSize: 11, color: '#9AA0AA', marginTop: 6 }}>未手动配图：将自动使用作品图与所选素材封面（约 1-6 张）</div>}
-          </Field>
-        )}
-
-        <div className="row" style={{ gap: 10, marginTop: 8 }}>
-          <button className="c-btn c-btn-primary c-btn-lg flex-1" disabled={publishing || !content.trim()} onClick={publish}>
+        <div className="row" style={{ gap: 10, marginTop: 10 }}>
+          <button className="c-btn c-btn-primary c-btn-lg flex-1" disabled={publishing || !content.trim() || !workId} onClick={publish}>
             <Icon name="send" size={15} />{publishing ? '发布中…' : '发布推文'}
           </button>
         </div>
       </div>
 
-      {/* ================= 右：市场认可进度卡 ================= */}
-      <div style={{ width: 350, flexShrink: 0 }}>
+      {/* ================= 右：我的推文（市场认可进度） ================= */}
+      <div style={{ width: 380, flexShrink: 0 }}>
         <div className="c-card">
-          <div className="c-card-hd">
-            <span className="c-card-title">市场认可进度</span>
-            <span className="c-pill">实时增量评估</span>
-          </div>
-          <div className="c-notice brand">
-            <Icon name="megaphone" size={15} />
-            <span><b>入池规则：</b>点赞超过当日平台推文 P60（≈前 40% 热度），<b>或</b> 评论数 ≥10，系统<b>自动将作品纳入资源池</b>并通知你准备橱窗材料。</span>
+          <div className="c-card-hd" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <span className="c-card-title">我的推文</span>
+            <div className="c-tabs">
+              {RANGE_TABS.map((r) => (
+                <button key={r.key} className={`c-tab ${days === r.key ? 'on' : ''}`} onClick={() => { if (days !== r.key) loadMine(r.key); }}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {!published ? (
-            <div style={{ marginTop: 12 }}>
-              <div className="c-state" style={{ padding: '26px 10px' }}>
-                <div className="ico" style={{ width: 50, height: 50, background: '#F7F8FA', color: '#B7BCC6' }}>
-                  <Icon name="send" size={22} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>发布后在这里跟踪进度</div>
-                <div className="c-hint" style={{ fontSize: 11.5, marginTop: 6 }}>点赞/评论一旦变化，引擎即对你的推文做增量评估（可点刷新）。</div>
-              </div>
+          {myLoading ? <Loading text="加载我的推文…" /> : null}
+          {!myLoading && myList.length === 0 && (
+            <div className="c-state" style={{ padding: '26px 10px' }}>
+              <div className="ico" style={{ background: '#F7F8FA', color: '#B7BCC6' }}><Icon name="send" size={22} /></div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>该时间段暂无推文</div>
+              <div className="c-hint" style={{ fontSize: 11.5, marginTop: 6 }}>发布后展示 点赞 vs 当日 P60 / 评论 10 条的进度，达标自动入资源池</div>
             </div>
-          ) : (
-            <MarketCard post={published} refreshing={refreshTick > 0} onRefresh={refreshMarket} onGoPool={() => navigate('/creator/pool')} onSimulate={simulateHeat} simulating={publishing} />
           )}
+
+          {!myLoading && myList.map((p) => <MyPostRow key={p.id} post={p} simulating={publishing} onSimulate={() => simulate(p)} onOpen={() => navigate(`/post/${p.id}`)} />)}
         </div>
 
         <div className="c-card" style={{ marginTop: 12 }}>
           <div className="c-card-title" style={{ marginBottom: 10 }}>发布小贴士</div>
           <ul style={{ fontSize: 11.5, color: '#6B7180', lineHeight: 2.1, paddingLeft: 16 }}>
-            <li>关联作品后，点赞/评论会同时带动作品热度</li>
+            <li>推文必须关联一件「作品」，作品请先在「作品」页创建</li>
+            <li>点赞超过当日平台 P60，或评论 ≥10，系统自动纳入资源池并通知你</li>
             <li>入池后 → 资源池 → 「去上橱窗」准备真人穿搭图与规格</li>
-            <li>橱窗材料审核通过即自动上架商城并生成 AI 详情页</li>
           </ul>
         </div>
       </div>
 
       {/* ================= 弹层 ================= */}
-      {pick === 'pattern' && <MaterialPickModal title="选择打版素材" mats={patternMats} value={patternIds} onChange={setPatternIds} onClose={() => setPick(null)} />}
-      {pick === 'model' && <MaterialPickModal title="选择 3D 素材" mats={modelMats} value={modelIds} onChange={setModelIds} onClose={() => setPick(null)} />}
-      {pick === 'image' && (
-        <Modal narrow onClose={() => setPick(null)} title="选择配图（图片素材）" icon="image">
-          <div className="pick-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))' }}>
-            {imgMats.map((m: Material) => {
-              const on = images.includes(m.cover || '');
-              return (
-                <div key={m.id} className={`pick-cell ${on ? 'on' : ''}`} onClick={() => {
-                  const c = m.cover || '';
-                  setImages((prev) => (on ? prev.filter((x) => x !== c) : prev.length < 6 ? [...prev, c] : prev));
-                }}>
-                  <div className="ph"><img src={imgSafe(m.cover)} alt="" onError={hideBadImg} loading="lazy" /></div>
-                  <span className="ck">{on ? <Icon name="check" size={12} /> : null}</span>
-                  <span className="cap">{m.title}</span>
-                </div>
-              );
-            })}
-            {!imgMats.length && <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#9AA0AA', fontSize: 12.5, padding: 20 }}>暂无图片素材（png/jpg），可去素材库导入</div>}
-          </div>
-        </Modal>
-      )}
+      {pick === 'pattern' && <MaterialPickModal title="选择打版素材（DXF/SVG）" mats={patternMats} value={patternIds} onChange={setPatternIds} onClose={() => setPick(null)} />}
+      {pick === 'model' && <MaterialPickModal title="选择 3D 素材（OBJ/GLB）" mats={modelMats} value={modelIds} onChange={setModelIds} onClose={() => setPick(null)} />}
     </div>
   );
 }
 
-/* ------------------------- 市场认可进度卡 ------------------------- */
-export function MarketCard({ post, refreshing, onRefresh, onGoPool, onOpen, onSimulate, simulating }: {
-  post: FeedItem;
-  refreshing?: boolean;
-  onRefresh?: () => void;
-  onGoPool?: () => void;
-  onOpen?: () => void;
-  onSimulate?: () => void;
-  simulating?: boolean;
+/* ------------------------- 单条推文的市场认可进度 ------------------------- */
+function MyPostRow({ post, simulating, onSimulate, onOpen }: {
+  post: FeedItem; simulating?: boolean; onSimulate: () => void; onOpen: () => void;
 }) {
   const m = post.market;
   const p60 = m?.p60 ?? 0;
   const commentTarget = m?.commentTarget ?? 10;
   const qualified = !!m?.qualified;
-  const likePct = Math.min(100, p60 > 0 ? Math.round(((m?.likes ?? 0) / p60) * 100) : (m?.likes ?? 0) > 0 ? 100 : 0);
-  const commentPct = Math.min(100, Math.round(((m?.comments ?? 0) / commentTarget) * 100));
-  const reasons: string[] = [];
-  if ((m?.likes ?? 0) > p60) reasons.push(`点赞 ${m?.likes} > P60 ${p60}`);
-  if ((m?.comments ?? 0) >= commentTarget) reasons.push(`评论 ${m?.comments} ≥ ${commentTarget}`);
-
+  const likes = m?.likes ?? post.likes ?? 0;
+  const comments = m?.comments ?? post.commentCount ?? 0;
+  const likePct = Math.min(100, p60 > 0 ? Math.round((likes / p60) * 100) : likes > 0 ? 100 : 0);
+  const commentPct = Math.min(100, Math.round((comments / commentTarget) * 100));
   return (
-    <div style={{ marginTop: 12 }}>
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-        <b style={{ fontSize: 13 }}>{post.workId ? `作品推文 #${post.id}` : `推文 #${post.id}`}</b>
-        {onRefresh && (
-          <button className="c-btn c-btn-sm c-btn-outline" onClick={onRefresh} disabled={refreshing}>
-            <Icon name="refresh" size={12} />{refreshing ? '刷新中…' : '刷新'}
-          </button>
-        )}
-      </div>
-      <div className="ellipsis" style={{ fontSize: 12, color: '#6B7180', marginBottom: 12 }}>{post.content}</div>
+    <div style={{ padding: '12px 2px', borderBottom: '1px solid #F0F1F4' }}>
+      <button onClick={onOpen} className="row" style={{ width: '100%', gap: 8, alignItems: 'flex-start', textAlign: 'left' }}>
+        <img src={imgSafe(post.images?.[0])} alt="" onError={hideBadImg} style={{ width: 48, height: 60, objectFit: 'cover', borderRadius: 8, background: '#F1F2F5', flexShrink: 0 }} />
+        <div className="flex-1" style={{ minWidth: 0 }}>
+          <div className="ellipsis-2" style={{ fontSize: 12.5, lineHeight: 1.6 }}>{post.content}</div>
+          <div className="row" style={{ gap: 6, marginTop: 4, fontSize: 10.5, color: '#9AA0AA' }}>
+            <span className="row" style={{ gap: 2 }}><Icon name="heart" size={10} color="#E85C87" />{fmtCount(likes)}</span>
+            <span className="row" style={{ gap: 2 }}><Icon name="comment" size={10} color="#3B82F6" />{fmtCount(comments)}</span>
+            <span>{relTime(post.createdAt)}</span>
+          </div>
+        </div>
+        {qualified ? <span className="c-badge c-badge-green"><Icon name="check-circle" size={10} />已入池</span> : <span className="c-badge c-badge-gray">验证中</span>}
+      </button>
 
-      {qualified ? (
-        <div className="c-notice ok" style={{ marginBottom: 12 }}>
-          <Icon name="check-circle" size={16} />
-          <span><b>已自动纳入资源池 🎉</b><br />{m?.p60Note}，已达标：{reasons.join('；')}</span>
+      {/* 进度条 */}
+      <div style={{ margin: '8px 0 4px', display: 'grid', gap: 6, gridTemplateColumns: '1fr 1fr' }}>
+        <div>
+          <div className="row" style={{ justifyContent: 'space-between', fontSize: 10.5, color: '#6B7180' }}>
+            <span>点赞热度</span><b>{likes}/{p60 || '-'}</b>
+          </div>
+          <div className="c-progress"><i style={{ width: `${likePct}%` }} /></div>
         </div>
-      ) : (
-        <div className="c-notice info" style={{ marginBottom: 12 }}>
-          <Icon name="clock" size={15} />
-          <span>尚未达标：{m?.p60Note || `P60=${p60}`}。评论达 {m?.comments ?? 0}/{commentTarget}。引擎会随点赞/评论实时增量评估。</span>
+        <div>
+          <div className="row" style={{ justifyContent: 'space-between', fontSize: 10.5, color: '#6B7180' }}>
+            <span>评论</span><b>{comments}/{commentTarget}</b>
+          </div>
+          <div className="c-progress"><i style={{ width: `${commentPct}%`, background: '#3B82F6' }} /></div>
         </div>
-      )}
-
-      <div style={{ marginBottom: 10 }}>
-        <div className="row" style={{ justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-          <span className="row" style={{ gap: 4 }}><Icon name="heart" size={12} color="#E85C87" />点赞热度</span>
-          <b>{m?.likes ?? 0} <span style={{ color: '#9AA0AA', fontWeight: 500 }}>/ {p60}（P60）</span></b>
-        </div>
-        <div className="c-progress"><i style={{ width: `${likePct}%` }} /></div>
       </div>
-      <div>
-        <div className="row" style={{ justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-          <span className="row" style={{ gap: 4 }}><Icon name="comment" size={12} color="#3B82F6" />讨论热度</span>
-          <b>{m?.comments ?? 0} <span style={{ color: '#9AA0AA', fontWeight: 500 }}>/ {commentTarget} 条评论</span></b>
-        </div>
-        <div className="c-progress"><i style={{ width: `${commentPct}%` }} /></div>
-      </div>
-
-      {qualified && onGoPool && (
-        <button className="c-btn c-btn-primary" style={{ width: '100%', marginTop: 14 }} onClick={onGoPool}>
-          <Icon name="grid" size={14} />去资源池查看 / 上橱窗
-        </button>
-      )}
-      {onOpen && <div style={{ fontSize: 11, color: '#9AA0AA', marginTop: 8 }}>点击推文可查看完整动态（{post.likes} 赞 · {post.commentCount} 评论）</div>}
       {!qualified && (
-        <div style={{ fontSize: 11, color: '#A8AEB8', marginTop: 12, lineHeight: 1.8 }}>
-          到消费者首页为它点赞/评论即可让引擎评估 → 达标自动入池。
-          {refreshing && ' 正在刷新…'}
-        </div>
-      )}
-      {!qualified && onSimulate && (
-        <button className="c-btn c-btn-outline" style={{ width: '100%', marginTop: 10 }} onClick={onSimulate} disabled={simulating}>
-          <Icon name="fire" size={13} />{simulating ? '模拟中…' : '演示：模拟互动热度 → 自动入池'}
+        <button className="c-btn c-btn-outline c-btn-sm" style={{ width: '100%' }} disabled={simulating} onClick={onSimulate}>
+          <Icon name="fire" size={12} />{simulating ? '模拟中…' : '演示：模拟互动热度 → 自动入池'}
         </button>
       )}
     </div>

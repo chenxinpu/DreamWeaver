@@ -12,7 +12,7 @@ import { useMe } from '../api/session';
 
 const GridEntry: { icon: IconName; label: string; path: string; color: string; bg: string; ext?: string }[] = [
   { icon: 'store', label: '商城', path: '/mall/home', color: '#E85C87', bg: '#FBEDF2' },
-  { icon: 'pen-tool', label: '创作者平台', path: '/creator', color: '#7C5CD6', bg: '#F0EBFC' },
+  { icon: 'pen-tool', label: '创作者中心', path: '/c/home', color: '#7C5CD6', bg: '#F0EBFC' },
   { icon: 'cart', label: '二手集市', path: '/mall/resale', color: '#3B82F6', bg: '#EAF2FE' },
   { icon: 'book', label: '学习中心', path: '/learn', color: '#C9A23F', bg: '#FBF4E2' },
   { icon: 'star', label: '收藏夹', path: '/me/collections', color: '#F59E0B', bg: '#FDF3E3' },

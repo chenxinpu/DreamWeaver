@@ -60,6 +60,16 @@ import CreatorSettingsPage from './pages/creator/SettingsPage';
 import AuditPage from './pages/creator/AuditPage';
 import NotFoundPage from './pages/NotFoundPage';
 
+/* 创作者中心（移动版，/c*：430 手机壳，SideDrawer「创作者中心」入口跳 /c/home） */
+import MCreatorLayout from './pages/mcreator/layout';
+import MHomePage from './pages/mcreator/HomePage';
+import MWorksPage from './pages/mcreator/WorksPage';
+import MPublishPage from './pages/mcreator/PublishPage';
+import MWindowPage from './pages/mcreator/WindowPage';
+import MProductsPage from './pages/mcreator/ProductsPage';
+import MLibraryPage from './pages/mcreator/LibraryPage';
+import MPoolPage from './pages/mcreator/PoolPage';
+
 export default function App() {
   return (
     <ToastProvider>
@@ -100,9 +110,23 @@ function ModeRoot() {
     );
   }
   const mall = path.startsWith('/mall');
+  const mcreator = path.startsWith('/c');
   return (
-    <div className={`app-shell ${mall ? 'mall-mode' : ''}`}>
+    <div className={`app-shell ${mall ? 'mall-mode' : ''} ${mcreator ? 'mc-mode' : ''}`}>
       <Routes>
+        {/* 创作者中心（移动版）—— 自带顶栏 + 底部 5 Tab；/c → /c/home */}
+        <Route path="/c" element={<MCreatorLayout />}>
+          <Route index element={<Navigate to="/c/home" replace />} />
+          <Route path="home" element={<MHomePage />} />
+          <Route path="works" element={<MWorksPage />} />
+          <Route path="publish" element={<MPublishPage />} />
+          <Route path="window" element={<MWindowPage />} />
+          <Route path="products" element={<MProductsPage />} />
+          <Route path="library" element={<MLibraryPage />} />
+          <Route path="pool" element={<MPoolPage />} />
+          <Route path="*" element={<Navigate to="/c/home" replace />} />
+        </Route>
+
         {/* 消费者壳（含 /login 与 404） */}
         <Route element={<ConsumerLayout />}>
           <Route path="/login" element={<LoginPage />} />

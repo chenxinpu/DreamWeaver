@@ -11,6 +11,10 @@ export const windowRouter = Router();
 
 const CATEGORIES = ['连衣裙', '衬衫', '半裙', '外套', '裤装', '套装'];
 
+/** 平台默认定价（橱窗材料表单不再采集原价/基础费用，审核通过时由平台按品类给参考价） */
+const DEFAULT_PRICE: Record<string, number> = { 连衣裙: 299, 衬衫: 189, 半裙: 169, 外套: 699, 裤装: 229, 套装: 459 };
+const DEFAULT_BASE_FEE: Record<string, number> = { 连衣裙: 79, 衬衫: 59, 半裙: 59, 外套: 109, 裤装: 69, 套装: 99 };
+
 function readBody(b: Record<string, unknown>): {
   workId: number; postId?: number; photos: string[]; partsFabric: FabricPart[];
   spec: WindowSpec; productName: string; category: string; styleTags: string[];
@@ -24,6 +28,10 @@ function readBody(b: Record<string, unknown>): {
   const specRaw = (b.spec || {}) as { label?: string; sizeChart?: WindowSpec['sizeChart']; note?: string };
   const sizeChart: WindowSpec['sizeChart'] = Array.isArray(specRaw.sizeChart) ? specRaw.sizeChart : [];
   const spec: WindowSpec = { label: String(specRaw.label || '标准版型'), sizeChart, ...(specRaw.note ? { note: String(specRaw.note) } : {}) };
+  const category = String(b.category || '');
+  // 原价/基础费用不再由表单填写：未提供时采用平台按品类默认定价
+  const price = Number(b.price) > 0 ? Number(b.price) : (DEFAULT_PRICE[category] || 299);
+  const baseFee = Number(b.baseFee) > 0 ? Number(b.baseFee) : (DEFAULT_BASE_FEE[category] || 79);
   return {
     workId,
     ...(b.postId ? { postId: Number(b.postId) } : {}),
@@ -31,10 +39,10 @@ function readBody(b: Record<string, unknown>): {
     partsFabric,
     spec,
     productName: String(b.productName || ''),
-    category: String(b.category || ''),
+    category,
     styleTags: Array.isArray(b.styleTags) ? b.styleTags.map(String) : [],
-    price: Number(b.price) || 0,
-    baseFee: Number(b.baseFee) || 0,
+    price,
+    baseFee,
     patternMatIds: Array.isArray(b.patternMatIds) ? b.patternMatIds.map(Number) : [],
     modelMatIds: Array.isArray(b.modelMatIds) ? b.modelMatIds.map(Number) : [],
     action,
@@ -43,6 +51,13 @@ function readBody(b: Record<string, unknown>): {
 
 function validateOwn(w: WindowMaterial, uid: number): WindowMaterial {
   if (w.creatorId !== uid) deny('只能操作自己的橱窗材料');
+  return w;
+}
+
+/** 平台默认定价补齐：原价/基础费用缺失时按品类自动给参考价（表单已不再采集） */
+function ensurePricing(w: WindowMaterial): WindowMaterial {
+  if (!(w.price > 0)) w.price = DEFAULT_PRICE[w.category] || DEFAULT_PRICE['连衣裙'];
+  if (!(w.baseFee > 0)) w.baseFee = DEFAULT_BASE_FEE[w.category] || DEFAULT_BASE_FEE['连衣裙'];
   return w;
 }
 
@@ -91,6 +106,7 @@ windowRouter.post('/creator/window', wrap(async (req, res) => {
   };
   db.windows.push(w);
   if (b.action === 'submit') {
+    ensurePricing(w);
     const result = submitAndAudit(w);
     res.json(ok({ ...w, audit: { pass: result.pass, missing: result.missing, note: result.note, product: result.product ? { id: result.product.id, title: result.product.title } : null }, completeness: checkCompleteness(w) }));
     return;
@@ -136,6 +152,7 @@ windowRouter.patch('/creator/window/:id', wrap(async (req, res) => {
     }
   }
   if (b.action === 'submit') {
+    ensurePricing(w);
     const result = submitAndAudit(w);
     res.json(ok({ ...w, audit: { pass: result.pass, missing: result.missing, note: result.note, product: result.product ? { id: result.product.id, title: result.product.title } : null }, offShelf: wasApproved, completeness: checkCompleteness(w) }));
     return;
@@ -150,8 +167,26 @@ windowRouter.post('/creator/window/:id/submit', wrap(async (req, res) => {
   const w = db.windows.find((x) => x.id === Number(req.params.id));
   if (!w) notFound('橱窗材料不存在');
   validateOwn(w, uid);
+  ensurePricing(w);
   const result = submitAndAudit(w);
   res.json(ok({ ...w, audit: { pass: result.pass, missing: result.missing, note: result.note, product: result.product ? { id: result.product.id, title: result.product.title } : null }, completeness: checkCompleteness(w) }));
+}));
+
+/** 删除橱窗材料（仅草稿 / 被拒状态可删；审核中、已通过需先处理关联商品） */
+windowRouter.delete('/creator/window/:id', wrap(async (req, res) => {
+  const uid = currentUserId(req);
+  const idx = db.windows.findIndex((x) => x.id === Number(req.params.id));
+  if (idx < 0) notFound('橱窗材料不存在');
+  const w = db.windows[idx];
+  validateOwn(w, uid);
+  if (w.status === 'approved' || w.status === 'submitted') {
+    deny(w.status === 'approved' ? '该材料已审核通过并生成商品，请先到「商品管理」下架后再处理' : '该材料正在审核中，暂不能删除，可在审核通过/驳回后再删除');
+  }
+  const product = db.products.find((p) => p.windowId === w.id);
+  if (product) deny('该材料已生成商品，请先在商品管理中下架删除关联商品');
+  db.windows.splice(idx, 1);
+  touch();
+  res.json(ok({ deleted: true, id: w.id }));
 }));
 
 windowRouter.get('/creator/window/:id', wrap(async (req, res) => {

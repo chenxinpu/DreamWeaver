@@ -1,6 +1,6 @@
 # 织梦 · 官方平台 V2（全栈前端）
 
-依据 `apps/iter_v2.md` 迭代。本仓库前端 = 三种独立网页形态，全部数据来自 `apps/server`（Express + TS，端口 8787，Vite dev 将 `/api` 代理过去）。
+依据 `apps/v2_0.md` 迭代。本仓库前端 = 三种独立网页形态，全部数据来自 `apps/server`（Express + TS，端口 8787，Vite dev 将 `/api` 代理过去）。
 
 ## 快速开始
 
@@ -19,11 +19,21 @@ cd ../official && npm install && npm run dev  # 前端 http://localhost:5173
 
 ## 路由族（全部中文 UI）
 
-### 消费者手机壳（底部 Tab：首页/消息/我的；左上角头像开侧边栏 → 商城/创作者平台/二手集市/学习中心…）
+### 消费者手机壳（底部 Tab：首页/消息/我的；左上角头像开侧边栏 → 商城/创作者中心(移动版)/二手集市/学习中心…）
 ```
 /home  /post/:id  /search  /messages  /login
 /me  /me/body（手动12项 + AI 量体演示） /me/preferences /me/collections /me/settings /me/help
 /learn  /learn/course/:id  /learn/upload
+```
+
+### 创作者中心移动版（官方侧边栏入口；430 手机壳，底部 5 Tab：总览/作品/发布/橱窗/商品；镜像桌面功能）
+```
+/c/home  总览（KPI + 快捷宫格 + 待办）
+/c/works 作品（品类联动风格标签；按品类分组；编辑/删除/去发布）
+/c/publish 发推文（关联作品置顶、配图+预览一体、手动话题；下方「我的推文」近 1/3/7 天进度）
+/c/window 橱窗材料（无原价/基础费字段、平台定价；被拒可删除）
+/c/products 商品管理（状态/上下架/佣金率）
+/c/library 素材库（本地/示例导入 DXF/OBJ/SVG…）  /c/pool 资源池（立即评估 + 去上橱窗）
 ```
 
 ### 商城独立页（自带底部导航：推荐/分类/购物车/我的；入口在侧边栏，参考抖音商城）
@@ -36,14 +46,14 @@ cd ../official && npm install && npm run dev  # 前端 http://localhost:5173
 /mall/resale  /mall/resale/mine(降价/下架/已售)  /mall/mine
 ```
 
-### 创作者平台桌面网页（左导航 12 模块，BI 规范）
+### 创作者平台桌面网页（左导航 12 模块，BI 规范；保留用于打包原生桌面应用）
 ```
-/creator                总览（KPI/待办/最近订单/快捷入口）
+/creator                总览（KPI/待办/快捷入口；已移除资源池引擎与最近订单）
 /creator/library        素材库 → 导入主流软件结果文件（DXF/OBJ/SVG…真实解析预览）
-/creator/works          作品组织（素材组装）
-/creator/publish        发推文 + 市场认可进度卡（P60/评论10，含演示热度按钮）
+/creator/works          作品（说明文案+新建；风格标签随品类联动；按品类分组 + 编辑/删除管理）
+/creator/publish        发推文（关联作品置顶/配图与预览合并/手动话题；右侧「我的推文」近 1/3/7 天进度 + 演示热度）
 /creator/pool           资源池（引擎规则 + 立即评估 + 去上橱窗）
-/creator/window         橱窗材料（真人穿搭图/部件面料/规格尺码/价格/基础费 → 系统自动审核 → AI 详情上架）
+/creator/window         橱窗材料（真人穿搭图/部件面料/规格尺码 → 平台定价自动生成 → 系统审核 → AI 详情上架；被拒可删除）
 /creator/products       商品管理（AI 详情非材料内容编辑 + 佣金率逐条原因 + 上下架）
 /creator/dashboard      数据看板（7/30/90 天 BI：KPI/趋势/对比/退货/渠道/明细/池重复度）
 /creator/commission     佣金（2%–10% 规则逐条 + 可提现/待结算/流水/提现）

@@ -92,6 +92,20 @@ feedRouter.get('/feed', wrap(async (req, res) => {
   res.json(ok({ ...paged, list: paged.list.map((p) => postDTO(p, uid)), tab, meta: poolMeta() }));
 }));
 
+/** 我的推文（作者本人，按近 1/3/7 天筛选；每条附带 market 市场认可进度） */
+feedRouter.get('/posts/mine', wrap(async (req, res) => {
+  const uid = currentUserId(req);
+  const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+  const since = Date.now() - days * 86400000;
+  const list = db.posts
+    .filter((p) => p.authorId === uid && Date.parse(p.createdAt) >= since)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const page = Number(req.query.page) || 1;
+  const pageSize = Number(req.query.pageSize) || 30;
+  const paged = paginate(list, page, pageSize);
+  res.json(ok({ ...paged, days, list: paged.list.map((p) => postDTO(p, uid, { detail: true })) }));
+}));
+
 feedRouter.get('/posts/:id', wrap(async (req, res) => {
   const uid = currentUserId(req);
   const id = Number(req.params.id);

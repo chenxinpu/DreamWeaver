@@ -115,13 +115,16 @@ export const api = {
       request<{ fileName: string; kind: string; content: string; size: number }>('GET', '/materials/sample-content', { file }),
   },
   works: {
-    create: (payload: Partial<Work>) => request<{ work: Work }>('POST', '/works', payload),
+    create: (payload: Partial<Work>) => request<Work>('POST', '/works', payload),
+    update: (id: number | string, patch: Partial<Work>) => request<Work>('PATCH', `/works/${id}`, patch),
+    remove: (id: number | string) => request<{ deleted: boolean; id: number }>('DELETE', `/works/${id}`),
     mine: () => request<SimpleList<Work>>('GET', '/works/mine'),
     get: (id: number | string) => request<{ work: Work; inPool?: boolean; pool?: PoolEntry[]; product?: { id: number; status: string; title: string } | null }>('GET', `/works/${id}`),
   },
   posts: {
     create: (payload: Record<string, unknown>) => request<Post>('POST', '/posts', payload),
     get: (id: number | string) => request<FeedItem>('GET', `/posts/${id}`),
+    mine: (p?: { days?: number; page?: number }) => request<Paged<FeedItem> & { days?: number }>('GET', '/posts/mine', p as Params),
     like: (id: number | string) => request<Post>('POST', `/posts/${id}/like`),
     unlike: (id: number | string) => request<Post>('POST', `/posts/${id}/unlike`),
     comment: (id: number | string, content: string) =>
@@ -144,6 +147,7 @@ export const api = {
     submitId: (id: number | string) => request<WindowMaterial>('POST', `/creator/window/${id}/submit`),
     patch: (id: number | string, patch: Record<string, unknown>) =>
       request<WindowMaterial>('PATCH', `/creator/window/${id}`, patch),
+    remove: (id: number | string) => request<{ deleted: boolean; id: number }>('DELETE', `/creator/window/${id}`),
   },
   products: {
     list: (p?: { category?: string; kw?: string; sort?: string; page?: number; pageSize?: number; creatorId?: number }) =>

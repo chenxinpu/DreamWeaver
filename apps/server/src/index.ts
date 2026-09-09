@@ -24,7 +24,7 @@ function isPublicApi(req: express.Request): boolean {
   const isGet = req.method === 'GET' || req.method === 'HEAD';
   if (isGet) {
     if (p === '/feed' || p.startsWith('/feed/')) return true;
-    if (p.startsWith('/posts/')) return true;                    // 推文详情/评论列表
+    if (/^\/posts\/\d+$/.test(p)) return true;               // 推文详情公开（/posts/mine 等须登录）
     if (p === '/mall/products' || p.startsWith('/products/')) return true; // 商城列表/详情
     if (p === '/mall/resale') return true;                       // 二手集市公开浏览（/resale/* 仍须登录）
     if (p === '/materials/import-help' || p.startsWith('/materials/sample-content')) return true;

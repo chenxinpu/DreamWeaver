@@ -69,10 +69,10 @@ export function postDTO(p: Post, viewerId: number, opts?: { detail?: boolean }) 
       const todayPosts = db.posts.filter((x) => x.dateKey === p.dateKey);
       const likesAll = todayPosts.map((x) => x.likes).sort((a, b) => a - b);
       const n = likesAll.length;
-      const p60 = n >= 3 ? likesAll[Math.min(n - 1, Math.ceil(n * 0.6) - 1)] : n ? likesAll.reduce((a, b) => a + b, 0) / n : 0;
+      const p60 = n >= 3 ? likesAll[Math.min(n - 1, Math.ceil(n * 0.6) - 1)] : 0;
       dto.market = {
         p60: Math.round(p60),
-        p60Note: n >= 3 ? `当日共 ${n} 篇推文，P60=${Math.round(p60)}（点赞超过即入池）` : n ? `当日仅 ${n} 篇，按均值 P60=${Math.round(p60)}` : '当日暂无其他推文',
+        p60Note: n >= 3 ? `当日共 ${n} 篇推文，P60=${Math.round(p60)}（点赞超过即入池）` : n ? `当日仅 ${n} 篇（冷启动），P60=0，点赞 >0 即入池` : '当日暂无其他推文',
         commentTarget: 10,
         likes: p.likes,
         comments: p.commentCount,
