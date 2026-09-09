@@ -1,8 +1,7 @@
 /* ============================================================================
  * /creator/publish 发推文 —— 同橱窗材料：顶部「文字介绍 + 发布新推文」按钮；
  * 点击后展开发布编辑器（关联作品置顶→内容→配图与预览合并→手动话题→3D/打版微调→发布）。
- * 右侧「我的推文」：近一天 / 近 3 天 / 近一周（tabs 同橱窗材料），每条市场认可进度，
- * 未达标推文可点「演示：模拟互动热度」演示自动入池。
+ * 空闲态：介绍 + 「我的推文」列表（近一天 / 近3天 / 近一周）。
  * ==========================================================================*/
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -11,7 +10,7 @@ import { useToast } from '../../components/Sheet';
 import { api } from '../../api/client';
 import type { FeedItem, Material, Work } from '../../api/types';
 import { hideBadImg, imgSafe, fmtCount, relTime } from '../../components/shared/utils';
-import { useAsync, Field, TagInput, MaterialPickModal, Loading, CState } from './_shared';
+import { useAsync, Field, TagInput, MaterialPickModal, Loading } from './_shared';
 
 const RANGE_TABS = [
   { key: 1, label: '近一天' },
@@ -84,7 +83,7 @@ export default function PublishPage() {
 
   const publish = async () => {
     if (!content.trim()) { toast('请填写推文内容'); return; }
-    if (!workId) { toast('请先在上方选择要发布的关联作品'); return; }
+    if (!workId) { toast('请先选择要发布的关联作品'); return; }
     setPublishing(true);
     try {
       const post = await api.posts.create({
@@ -96,7 +95,7 @@ export default function PublishPage() {
         modelMatIds: modelIds,
       });
       void post;
-      toast('推文已发布 🎉（引擎已做增量评估，可在右侧「我的推文」查看进度）', 'check');
+      toast('推文已发布 🎉（可在「我的推文」查看市场认可进度）', 'check');
       setContent('');
       setImages([]);
       setTags([]);
@@ -128,7 +127,7 @@ export default function PublishPage() {
         m.p60 = cur.market?.p60 ?? m.p60;
         m.likes = cur.market?.likes ?? m.likes;
       }
-      toast('热度已提升，但当日 P60 变化较快，请再试一次');
+      toast('热度已提升，但阈值变化较快，请再试一次');
     } catch (e) {
       toast((e as Error).message || '模拟失败');
     } finally {
@@ -136,17 +135,40 @@ export default function PublishPage() {
     }
   };
 
+  /* 右侧（编辑器模式）/ 空闲态可复用的「我的推文」与「提示」 */
+  const tweetsUI = (
+    <div className="c-card">
+      <div className="c-card-hd" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <span className="c-card-title">我的推文</span>
+        <div className="c-tabs">
+          {RANGE_TABS.map((r) => (
+            <button key={r.key} className={`c-tab ${days === r.key ? 'on' : ''}`} onClick={() => { if (days !== r.key) loadMine(r.key); }}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {myLoading ? <Loading text="加载我的推文…" /> : null}
+      {!myLoading && myList.length === 0 && (
+        <div className="c-state" style={{ padding: '24px 10px' }}>
+          <div className="ico" style={{ background: '#F7F8FA', color: '#B7BCC6' }}><Icon name="send" size={22} /></div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>该时间段暂无推文</div>
+          <div className="c-hint" style={{ fontSize: 11.5, marginTop: 6 }}>发布后实时展示市场认可进度，达标后系统会自动纳入资源池</div>
+        </div>
+      )}
+      {!myLoading && myList.map((p) => <MyPostRow key={p.id} post={p} simulating={publishing} onSimulate={() => simulate(p)} onOpen={() => navigate(`/post/${p.id}`)} />)}
+    </div>
+  );
+
   return (
     <div>
-      {/* 顶部：文字介绍 + 发布新推文按钮（同橱窗材料 / 作品） */}
+      {/* 顶部：文字介绍 + 发布新推文按钮 */}
       <div className="c-card">
         <div className="row" style={{ gap: 14, justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 320, maxWidth: 720 }}>
+          <div style={{ minWidth: 320, maxWidth: 640 }}>
             <div className="c-card-title" style={{ marginBottom: 6 }}>发布推文</div>
             <div className="c-hint">
-              把「作品」推给粉丝，让市场来投票：关联作品后自动带入其 <b>3D 结果图</b> 与 <b>打版图</b>，写清卖点、点选配图并加上话题。
-              发布即进入市场验证——<b>点赞超过当日平台 P60 或评论 ≥10</b>，作品会自动纳入资源池并提醒你准备橱窗材料
-              （真人穿搭图 / 各部件面料 / 规格尺码 / 3D 与打版文件）。可在右侧「我的推文」按 近一天/近3天/近一周 跟踪进度。
+              发布关联「作品」的推文给粉丝；市场认可<b>达标后，系统会自动将作品纳入资源池</b>，并提醒你继续准备上橱窗。
             </div>
           </div>
           {!editing && (
@@ -157,9 +179,9 @@ export default function PublishPage() {
         </div>
       </div>
 
-      <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
-        {/* ============ 左：编辑器 / 引导占位 ============ */}
-        {editing ? (
+      {editing ? (
+        <div className="row" style={{ alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+          {/* ============ 左：发布编辑器 ============ */}
           <div className="c-card flex-1" style={{ minWidth: 440, border: '1.5px solid #E8B9CB' }}>
             <div className="c-card-hd">
               <span className="c-card-title"><Icon name="send" size={15} color="var(--brand)" />发布新推文</span>
@@ -210,7 +232,6 @@ export default function PublishPage() {
               )}
               {!imgMats.length && <div style={{ color: '#9AA0AA', fontSize: 12.5, padding: '8px 0' }}>暂无图片素材（png/jpg），可去素材库导入</div>}
 
-              {/* 已选配图预览 */}
               {images.length > 0 && (
                 <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                   {images.map((s) => (
@@ -255,53 +276,18 @@ export default function PublishPage() {
               </button>
             </div>
           </div>
-        ) : (
-          <div className="c-card flex-1" style={{ minWidth: 440, minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CState
-              icon="send"
-              title="还没有进行中的发布"
-              desc="先到「作品」页创建作品，回到本页点右上角「发布新推文」：选作品 → 写内容 → 配图加话题 → 发布验证市场。"
-              action={<button className="c-btn c-btn-primary" onClick={() => { setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><Icon name="plus" size={14} />发布新推文</button>}
-            />
-          </div>
-        )}
 
-        {/* ============ 右：我的推文（市场认可进度） ============ */}
-        <div style={{ width: 380, flexShrink: 0 }}>
-          <div className="c-card">
-            <div className="c-card-hd" style={{ flexWrap: 'wrap', gap: 8 }}>
-              <span className="c-card-title">我的推文</span>
-              <div className="c-tabs">
-                {RANGE_TABS.map((r) => (
-                  <button key={r.key} className={`c-tab ${days === r.key ? 'on' : ''}`} onClick={() => { if (days !== r.key) loadMine(r.key); }}>
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {myLoading ? <Loading text="加载我的推文…" /> : null}
-            {!myLoading && myList.length === 0 && (
-              <div className="c-state" style={{ padding: '26px 10px' }}>
-                <div className="ico" style={{ background: '#F7F8FA', color: '#B7BCC6' }}><Icon name="send" size={22} /></div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>该时间段暂无推文</div>
-                <div className="c-hint" style={{ fontSize: 11.5, marginTop: 6 }}>发布后展示 点赞 vs 当日 P60 / 评论 10 条的进度，达标自动入资源池</div>
-              </div>
-            )}
-
-            {!myLoading && myList.map((p) => <MyPostRow key={p.id} post={p} simulating={publishing} onSimulate={() => simulate(p)} onOpen={() => navigate(`/post/${p.id}`)} />)}
-          </div>
-
-          <div className="c-card" style={{ marginTop: 12 }}>
-            <div className="c-card-title" style={{ marginBottom: 10 }}>发布小贴士</div>
-            <ul style={{ fontSize: 11.5, color: '#6B7180', lineHeight: 2.1, paddingLeft: 16 }}>
-              <li>推文必须关联一件「作品」，作品请先在「作品」页创建</li>
-              <li>点赞超过当日平台 P60，或评论 ≥10，系统自动纳入资源池并通知你</li>
-              <li>入池后 → 资源池 → 「去上橱窗」准备真人穿搭图与规格</li>
-            </ul>
+          {/* ============ 右：我的推文 ============ */}
+          <div style={{ width: 380, flexShrink: 0 }}>
+            {tweetsUI}
           </div>
         </div>
-      </div>
+      ) : (
+        /* ============ 空闲态：介绍下方直接是「我的推文」 ============ */
+        <div style={{ marginTop: 12, maxWidth: 820 }}>
+          {tweetsUI}
+        </div>
+      )}
 
       {/* ================= 弹层 ================= */}
       {pick === 'pattern' && <MaterialPickModal title="选择打版素材（DXF/SVG）" mats={patternMats} value={patternIds} onChange={setPatternIds} onClose={() => setPick(null)} />}

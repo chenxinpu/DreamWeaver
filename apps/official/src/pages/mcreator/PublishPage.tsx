@@ -150,7 +150,7 @@ export default function MPublishPage() {
               <Icon name="send" size={18} color="var(--brand)" />发布推文
             </div>
             <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.9, color: '#6B7180' }}>
-              把「作品」推给粉丝：先关联一件作品（自动带入其 3D 与打版素材），写清卖点、点选配图并加上话题。发布即进入<b>市场验证</b>——点赞超过当日 P60 或评论 ≥10，系统会把作品自动纳入资源池，并提醒你准备橱窗材料（真人穿搭图 / 规格表 / 3D 与打版文件）。
+              发布关联「作品」的推文给粉丝；市场认可<b>达标后，系统会自动将作品纳入资源池</b>，并提醒你继续准备上橱窗。
             </div>
           </div>
           {!editing && (
@@ -273,7 +273,7 @@ export default function MPublishPage() {
         )}
         {!myLoading && !myErr && myList.length === 0 && (
           <MEmpty icon="send" title="该时间段暂无推文"
-            desc="发布后展示 点赞 vs 当日 P60 / 评论 10 条的进度，达标自动入资源池" />
+            desc="发布后实时展示市场认可进度，达标后系统会自动纳入资源池" />
         )}
 
         {!myLoading && !myErr && myList.map((p) => (
@@ -282,7 +282,7 @@ export default function MPublishPage() {
 
         <div className="mc-note brand" style={{ marginTop: 8 }}>
           <Icon name="megaphone" size={14} />
-          <span>点赞超过当日平台 P60，或评论 ≥10，系统自动纳入资源池并通知你 → 资源池「去上橱窗」。</span>
+          <span>作品达标后系统会自动纳入资源池并通知你 → 资源池「去上橱窗」。</span>
         </div>
       </div>
 
