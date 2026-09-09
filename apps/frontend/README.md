@@ -5,8 +5,8 @@
 ## 快速开始
 
 ```bash
-cd ../server && npm install && npm run dev    # 后端 http://localhost:8787（自动播种演示数据）
-cd ../official && npm install && npm run dev  # 前端 http://localhost:5173
+cd apps/server && npm install && npm run dev    # 后端 http://localhost:8787（自动播种演示数据）
+cd apps/frontend && npm install && npm run dev  # 前端 http://localhost:5173
 ```
 
 ## 演示账号

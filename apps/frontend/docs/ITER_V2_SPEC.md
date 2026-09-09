@@ -1,6 +1,6 @@
 # 织梦 DreamWeaver V2 迭代规格（全栈实现契约）
 
-> 依据 `apps/v2_0.md`。本文档是 v2 全栈实现的**唯一契约**：后端（`apps/server`）与前端（`apps/official` V2 重写）都严格按其实现。
+> 依据 `apps/v2_0.md`。本文档是 v2 全栈实现的**唯一契约**：后端（`apps/server`）与前端（`apps/frontend` V2 重写）都严格按其实现。
 > 术语：**作品(work)**=创作者在素材库基础上组织的设计对象；**推文(post)**=发布到广场的内容；**资源池(pool)**=系统按规则自动筛选出的市场认可作品；**橱窗(showcase)**=创作者上架材料供平台审核；**商品(product)**=审核通过后 AI 生成详情页上架商城。
 
 ## 0. 版本目标（来自 iter_v2.md，全部实现）
@@ -15,7 +15,7 @@
 | 项 | 决策 |
 |---|---|
 | 后端 | `apps/server`：Node + Express + TypeScript；持久化 = JSON 文件库（`data/db.json`），纯 JS 无原生依赖；启动时自动 seed 演示数据；提供 `reset` 与手动触发评估的辅助接口 |
-| 前端 | `apps/official` V2 单仓库多路由族：consumer(手机壳 `#/`)、mall(手机壳独立页 `#/mall*`)、creator(桌面宽壳 `#/creator*`)；同一 Vite dev server，`/api` 代理到后端 |
+| 前端 | `apps/frontend` V2 单仓库多路由族：consumer(手机壳 `#/`)、mall(手机壳独立页 `#/mall*`)、creator(桌面宽壳 `#/creator*`)；同一 Vite dev server，`/api` 代理到后端 |
 | 身份 | Bearer token（mock）：登录页/角色切换选择演示账号；角色 consumer/creator/auditor/admin |
 | 格式解析 | 服务端纯 TS 解析器：DXF(R12 子集: LINE/LWPOLYLINE含bulge/CIRCLE/ARC/POINT/TEXT/LAYER)、OBJ(顶点/面)、SVG(直接内嵌)、图片(png/jpg base64)、glb/zprj/ai(仅元数据+封面) |
 | 3D 预览 | 前端 canvas 手写 OBJ 线框/着色旋转查看器（无 three 依赖）；GLB 显示元数据+占位 |
@@ -315,7 +315,7 @@ POST /dev/eval-pool               资源池立即评估
 
 **字段补充说明（前端必须展示）**：feed 推文 item 需带 author{id,nickname,avatar,level}、linkedWork(若 workId)、素材预览徽标（patternMatIds/modelMatIds 数量）、liked(当前用户是否点过) 由后端算好返回 `viewer:{liked,collected}`；comment item 带 author。orders seller 需要 order.creatorId。
 
-## 5. 前端页面与路由（apps/official V2）
+## 5. 前端页面与路由（apps/frontend V2）
 
 壳层判定：路径前缀 `/mall`(全屏手机壳+自己的底部导航)/ `/creator`(桌面宽壳+左侧导航)/ 其余 = consumer(手机壳，底部 Tab=首页/消息/我的)。
 
@@ -393,7 +393,7 @@ POST /dev/eval-pool               资源池立即评估
 
 ## 7. 工程要求
 
-- 代码可运行：`apps/server` `npm i && npm run dev`(8787)；`apps/official` `npm i && npm run dev`(5173, proxy /api)。`npm run build` 通过 tsc -b。
+- 代码可运行：`apps/server` `npm i && npm run dev`(8787)；`apps/frontend` `npm i && npm run dev`(5173, proxy /api)。`npm run build` 通过 tsc -b。
 - 命名/视觉延续 V1 设计 token（rose 渐变 #F27BA0→#E85C87→#D44771、底 #F6F4F1、卡片白、标签色板）；creator 桌面另建浅灰工作台样式但同品牌色。
 - 前端不直接写业务数据假数据（学习中心课程 mock 例外）；所有 v2 业务页面数据走 API。
 - 移除：V1 的 /ranking、投票、品牌孵化相关页面与 mock；`App.tsx` 按 5.x 路由重建。

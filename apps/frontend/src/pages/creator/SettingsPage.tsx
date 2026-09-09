@@ -146,7 +146,7 @@ export default function SettingsPage() {
           {!staff && <span className="c-hint">创作者账号演示角色受限；如需重置请先切换到审核员 #99。</span>}
         </div>
         <div style={{ fontSize: 10.5, color: '#B7BCC6', marginTop: 10 }}>
-          工程版本：apps/official V2（创作者平台桌面网页） · {user ? fmtDT(user.createdAt) : ''}
+          工程版本：apps/frontend V2（创作者平台桌面网页） · {user ? fmtDT(user.createdAt) : ''}
         </div>
       </div>
 

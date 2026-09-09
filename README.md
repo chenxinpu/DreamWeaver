@@ -13,7 +13,7 @@
 cd apps/server && npm install && npm run dev
 
 # 2) 官方前端（端口 5173；消费者端 + 商城独立页 + 创作者平台同仓，/api 代理到 8787）
-cd apps/official && npm install && npm run dev    # http://localhost:5173
+cd apps/frontend && npm install && npm run dev    # http://localhost:5173
 ```
 
 演示账号（登录页 / 侧边栏 / 创作者设置里可切换）：

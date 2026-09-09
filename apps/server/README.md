@@ -31,7 +31,8 @@ npm start        # node dist/index.js
 ## 自检
 
 ```bash
-cd apps/server && node ../official 无；参考 tools/ 下前端 dev
+cd apps/server && npm run dev   # 后端 :8787
+cd apps/frontend && npm run dev # 前端 :5173
 python3 /tmp/v2test.py   # 36 项全流程 API 自检（先自行登录导 token）
 ```
 
