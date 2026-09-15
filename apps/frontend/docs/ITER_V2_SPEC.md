@@ -1,11 +1,11 @@
 # 织梦 DreamWeaver V2 迭代规格（全栈实现契约）
 
-> 依据 `apps/v2_0.md`。本文档是 v2 全栈实现的**唯一契约**：后端（`apps/server`）与前端（`apps/frontend` V2 重写）都严格按其实现。
+> 依据 `apps/v2_0.md`。本文档是 v2 全栈实现的**唯一契约**：后端（`apps/backend`，Java / Spring Boot）与前端（`apps/frontend` V2 重写）都严格按其实现。
 > 术语：**作品(work)**=创作者在素材库基础上组织的设计对象；**推文(post)**=发布到广场的内容；**资源池(pool)**=系统按规则自动筛选出的市场认可作品；**橱窗(showcase)**=创作者上架材料供平台审核；**商品(product)**=审核通过后 AI 生成详情页上架商城。
 
 ## 0. 版本目标（来自 iter_v2.md，全部实现）
 
-1. **暂停自研设计 App 的创作链路**（apps/designer 保留为 V1 遗留、不再接入 V2 官方端）。官方端改为**导入主流软件结果文件**并在官方端呈现「3D 图 + 打版图」；导入入口在**创作者平台侧边栏「素材库」**。
+1. **暂停自研设计 App 的创作链路**（V1 自研设计器已移除，不再接入 V2 官方端）。官方端改为**导入主流软件结果文件**并在官方端呈现「3D 图 + 打版图」；导入入口在**创作者平台侧边栏「素材库」**。
 2. **创作变现全流程**：素材库导入 → 发推文（3D图/打版图来自素材库 + 标签）→ 点赞>当日推文点赞 P60 或 评论≥10 → **系统自动纳入资源池** → 通知提醒上橱窗 → 提交材料（真人穿搭图/规格表/3D与打版文件/基础费用/原价）→ 系统审核 → **AI 生成商品详情页上商城** → 变现数据看板（BI 规范）+ 佣金 2%~10%（KPI 浮动：退货率、资源池样式重复度）。
 3. **私人定制全流程**：商品详情页可「直接购买」或「私人定制」→ 按体型数据自动调整规格（系统主动提示哪个规格不合适）→ AI 交互改部件/元素/面料并出图 → 确认后**付全款（原价+基础费用）** → 退货只扣基础费用（原价退还）/ 换货重新定制再收一次基础费用 → 退货自动进**二手集市**（默认原价×75% 标价，成交抽成用于仓储物流，余款退原买家，可自行降价）。
 4. **信息架构**：商城**不占底部 Tab**、入口放**侧边栏**（参考抖音，从首页左上/头像处滑出）；底部 Tab = 首页 / 消息 / 我的；「我的」参考抖音个人主页但不照搬；**创作者平台与商城都是独立网页形态**（各自独立路由族 + 独立外壳布局，桌面/全屏，参考抖音商城与创作者中心）；删除品牌孵化、删除投票打榜。
@@ -14,7 +14,7 @@
 
 | 项 | 决策 |
 |---|---|
-| 后端 | `apps/server`：Node + Express + TypeScript；持久化 = JSON 文件库（`data/db.json`），纯 JS 无原生依赖；启动时自动 seed 演示数据；提供 `reset` 与手动触发评估的辅助接口 |
+| 后端 | `apps/backend`：Java 21 + Spring Boot 3；持久化 = JSON 文件库（`data/db.json`）；启动时自动 seed 演示数据；提供 `reset` 与手动触发评估的辅助接口；同端口提供 BFF 聚合与 WebSocket 实时通道 |
 | 前端 | `apps/frontend` V2 单仓库多路由族：consumer(手机壳 `#/`)、mall(手机壳独立页 `#/mall*`)、creator(桌面宽壳 `#/creator*`)；同一 Vite dev server，`/api` 代理到后端 |
 | 身份 | Bearer token（mock）：登录页/角色切换选择演示账号；角色 consumer/creator/auditor/admin |
 | 格式解析 | 服务端纯 TS 解析器：DXF(R12 子集: LINE/LWPOLYLINE含bulge/CIRCLE/ARC/POINT/TEXT/LAYER)、OBJ(顶点/面)、SVG(直接内嵌)、图片(png/jpg base64)、glb/zprj/ai(仅元数据+封面) |
@@ -383,17 +383,17 @@ POST /dev/eval-pool               资源池立即评估
 ## 6. Seed 演示数据（后端启动/重置自动生成，贴近 iter_v2 示例）
 
 - users：1 小织(creator, level3,头像 avatar-01) 2 鹿屿Lu(creator) 3 云端裁缝铺(creator level2) 4-13 达人/消费者（沿用 V1 昵称头像）14 我的小号(consumer——前端默认消费者身份，预置体型) 99 平台审核专员(auditor)。演示 creator 主账号=1。
-- materials：为 creator1/2/3 预置 DXF 打版（连衣裙前片/后片/袖，衬衫、半裙等多品类）、OBJ（连衣裙/大衣 2 个网格，由程序生成简单参数化 mesh）、SVG 印花/logo、png/jpg 素材（引 /images 下服装图）。示例文件写入 `apps/server/samples/*.dxf|*.obj|*.svg`，导入 demo 可直接使用。
+- materials：为 creator1/2/3 预置 DXF 打版（连衣裙前片/后片/袖，衬衫、半裙等多品类）、OBJ（连衣裙/大衣 2 个网格，由程序生成简单参数化 mesh）、SVG 印花/logo、png/jpg 素材（引 /images 下服装图）。示例文件写入 `apps/backend/samples/*.dxf|*.obj|*.svg`，导入 demo 可直接使用。
 - works/posts：creator1 有若干已入池作品与进行中作品（今日 2 篇推文点赞距 P60 一步之遥、1 篇高赞已入池制造演示差异）；其他创作者今日推文 8~12 篇形成 P60 分布。
 - window/products：creator1 至少 2 件已上架商品（含 aiDetail 完整）、1 件审核中、1 件被拒；creator2/3 各有 1-2 件。
 - orders/ledger/resale：过去 30 天订单与浏览事件种子（BI 图）；1 笔已收货定制订单（可演示退货→二手集市）；1 个 active 二手挂单。
 - notifications：各演示账号数条未读。
 
-> 生成的 sample OBJ/DXF 由后端程序在 seed 时构造并写入 `apps/server/samples/`（保证可导入演示）。
+> 生成的 sample OBJ/DXF 由后端程序在 seed 时构造并写入 `apps/backend/samples/`（保证可导入演示）。
 
 ## 7. 工程要求
 
-- 代码可运行：`apps/server` `npm i && npm run dev`(8787)；`apps/frontend` `npm i && npm run dev`(5173, proxy /api)。`npm run build` 通过 tsc -b。
+- 代码可运行：`apps/backend` `./mvnw spring-boot:run`(8787)；`apps/frontend` `npm i && npm run dev`(5173, proxy /api 与 /ws)。`npm run build` 通过 tsc -b。
 - 命名/视觉延续 V1 设计 token（rose 渐变 #F27BA0→#E85C87→#D44771、底 #F6F4F1、卡片白、标签色板）；creator 桌面另建浅灰工作台样式但同品牌色。
 - 前端不直接写业务数据假数据（学习中心课程 mock 例外）；所有 v2 业务页面数据走 API。
 - 移除：V1 的 /ranking、投票、品牌孵化相关页面与 mock；`App.tsx` 按 5.x 路由重建。

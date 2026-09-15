@@ -2,6 +2,14 @@
 .npm-cache/
 .pw-browsers/
 
+# 本地工具链（JDK / Maven 等，不提交）
+.tools/
+
+# Java / Python 服务构建产物（数据已落 MySQL，不再有本地数据目录）
+apps/backend/target/
+apps/ai/.venv/
+apps/ai/__pycache__/
+
 # node_modules（任意层级）
 node_modules/
 

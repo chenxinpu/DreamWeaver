@@ -1,11 +1,11 @@
 # 织梦 · 官方平台 V2（全栈前端）
 
-依据 `apps/v2_0.md` 迭代。本仓库前端 = 三种独立网页形态，全部数据来自 `apps/server`（Express + TS，端口 8787，Vite dev 将 `/api` 代理过去）。
+依据 `apps/v2_0.md` 迭代。本仓库前端 = 三种独立网页形态，全部数据来自 `apps/backend`（Java / Spring Boot，端口 8787，Vite dev 将 `/api` 与 `/ws` 代理过去）。
 
 ## 快速开始
 
 ```bash
-cd apps/server && npm install && npm run dev    # 后端 http://localhost:8787（自动播种演示数据）
+cd apps/backend && ./mvnw spring-boot:run      # 后端 http://localhost:8787（自动播种演示数据）
 cd apps/frontend && npm install && npm run dev  # 前端 http://localhost:5173
 ```
 

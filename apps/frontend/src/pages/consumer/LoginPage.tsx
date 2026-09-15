@@ -128,7 +128,7 @@ export default function LoginPage() {
         {guest && (
           <div style={{ background: 'var(--gold-soft)', border: '1px solid #F0DFAE', color: '#7A5B10', borderRadius: 14, padding: '12px 14px', fontSize: 12, lineHeight: 1.8, marginBottom: 14 }}>
             <span className="row" style={{ gap: 6, fontWeight: 700 }}><Icon name="bell" size={14} />后端服务未启动</span>
-            <div>请在 apps/server 启动（npm run dev → :8787）后回来登录；也可先浏览只读演示界面。</div>
+            <div>请先在仓库根目录执行 ./tools/dev/services.sh start（网关 :8787）后回来登录；也可先浏览只读演示界面。</div>
           </div>
         )}
       </div>

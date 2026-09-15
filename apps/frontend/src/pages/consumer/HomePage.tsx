@@ -146,7 +146,7 @@ export default function HomePage() {
             action={tab === 'follow' ? (
               <button className="btn btn-outline btn-sm" onClick={() => onSwitch('rec')}>看看推荐</button>
             ) : (
-              <button className="btn btn-outline btn-sm" onClick={() => toast('演示数据将由后端 seed 提供，请先启动 apps/server')}>刷新</button>
+              <button className="btn btn-outline btn-sm" onClick={() => toast('演示数据将由后端 seed 提供，请先启动核心服务（./tools/dev/services.sh start）')}>刷新</button>
             )}
           />
         </div>

@@ -39,7 +39,7 @@ export const isLoggedIn = () => !!getToken();
 
 /** 网络错误 / 服务端降级文案（后端未启动时页面据此展示友好提示） */
 export function networkHint(): string {
-  return '网络请求失败：请先启动后端服务（apps/server，端口 8787），或检查网络连接。';
+  return '网络请求失败：请先启动后端服务（./tools/dev/services.sh start → 网关 :8787），或检查网络连接。';
 }
 
 /* --------------------------- 底层请求 --------------------------- */

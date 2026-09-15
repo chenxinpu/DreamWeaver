@@ -1,0 +1,65 @@
+server:
+  port: ${PORT:8787}
+  address: ${DW_BIND:127.0.0.1}
+  shutdown: graceful
+
+spring:
+  application:
+    name: dreamweaver-backend
+
+  # ---------------- 数据源：MySQL ----------------
+  datasource:
+    url: jdbc:mysql://${DW_DB_HOST:127.0.0.1}:${DW_DB_PORT:3306}/${DW_DB_NAME:dreamweaver}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${DW_DB_USER:dw}
+    password: ${DW_DB_PASSWORD:dw123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: dreamweaver-pool
+      maximum-pool-size: 16
+      minimum-idle: 4
+      connection-timeout: 10000
+
+  # ---------------- ORM：Spring Data JPA / Hibernate ----------------
+  jpa:
+    hibernate:
+      ddl-auto: ${DW_DDL_AUTO:update}
+    open-in-view: false          # 禁止在视图层（Controller 序列化阶段）触发懒加载
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 50
+          time_zone: Asia/Shanghai
+    show-sql: ${DW_SHOW_SQL:false}
+
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+
+  mvc:
+    problemdetails:
+      enabled: false
+
+dw:
+  # Python AI 服务地址（AI 生成类能力唯一实现方）
+  ai-base-url: ${DW_AI_BASE_URL:http://127.0.0.1:8789}
+  # 服务间内部令牌（后端 → Python AI）
+  internal-token: ${DW_INTERNAL_TOKEN:dw-internal-dev-token}
+  # 首次启动且库为空时自动灌入演示数据
+  seed-demo-data: ${DW_SEED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    dreamweaver: INFO
+    org.hibernate.SQL: ${DW_SHOW_SQL:WARN}

@@ -454,7 +454,7 @@ export interface CustomContext {
 }
 
 /* ------------------------- 创作者平台（/creator）接口类型 -------------------------
- * 均按后端真实响应（apps/server routes/creator.ts · engine/dashboard.ts ·
+ * 均按后端真实响应（Java 核心 web/CreatorController.java · engine/DashboardEngine.java ·
  * engine/commission.ts · routes/dto.ts）标注；保留旧版字段（可选）以向后兼容。
  * --------------------------------------------------------------------------------*/
 

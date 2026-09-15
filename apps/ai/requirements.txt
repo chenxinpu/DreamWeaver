@@ -1,0 +1,4 @@
+# 织梦 Python AI 服务依赖（刻意保持最小：不引入 numpy/torch 等重型依赖）
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+pydantic>=2.6,<3.0

@@ -85,7 +85,7 @@ export function ErrorBox({ msg, onRetry, children }: { msg?: string; onRetry?: (
         <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6, lineHeight: 1.6 }}>{children}</div>
       ) : !msg ? (
         <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6, lineHeight: 1.6 }}>
-          请确认后端服务已启动（apps/server @ :8787），或检查网络连接。
+          请确认后端服务已启动（./tools/dev/services.sh start → 网关 :8787），或检查网络连接。
         </div>
       ) : null}
       {onRetry && (
